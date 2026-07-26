@@ -97,3 +97,17 @@ not all-regime alpha. It is a genuinely profitable *bull* momentum strategy (+26
 Sharpe 1.02) with one clear, honest limitation: **bear exposure / −33% max drawdown.**
 The next real lever is a *bear-defense* that doesn't cost the bull (the ATR trailing
 stop failed this — it cut the bull too).
+
+## engine_3 vs SPY buy & hold (same 5y window, 2021-07..2026-07)
+
+| strategy | total% | annRet% | annVol% | Sharpe | maxDD% | alpha vs SPY |
+|---|---|---|---|---|---|---|
+| SPY buy & hold | 68.3 | 11.9 | 17.2 | 0.69 | −25.4 | — |
+| equal-weight universe B&H | 86.8 | 13.9 | 16.4 | 0.85 | −17.9 | +2.0%/yr |
+| **engine_3 v0 (top-10)** | **260.0** | **30.2** | 29.7 | **1.02** | −33.4 | **+18.2%/yr** |
+
+engine_3 BEATS SPY risk-adjusted (Sharpe 1.02 vs 0.69) and BEATS equal-weight of the
+same universe (1.02 vs 0.85) — so the momentum SELECTION adds value beyond holding the
+basket. Honest cost: concentrated → higher vol (30% vs 17%) and deeper DD (−33% vs
+−25%); bull-skewed (train 0.45 / test 1.35); one in-sample window (PSR0 0.88). The
+next lever is a bear-defense that preserves the bull (targets the −33%).
