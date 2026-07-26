@@ -92,8 +92,13 @@ This doc is the file-by-file PORT / DROP / ADD / REFACTOR split + build order.
 
 ---
 
-## Open questions (decide before step 2)
+## Decisions (locked 2026-07-26)
 
-- **Universe:** S&P 500? Russell 1000 top-500 by liquidity? (Needs breadth for momentum, but liquid enough to fill — your no-intraday-illiquidity concern.)
-- **Visibility:** repo Private (assumed) — confirm.
-- **Sentiment/News:** keep as an optional engine_3 *feature/filter*, or drop entirely for the v1 clean test?
+- **Universe:** **Russell 1000** (top slice by liquidity) — more breadth/opportunity than
+  S&P 500, still liquid enough to fill (respects the no-intraday-illiquidity constraint).
+- **Legacy features:** **DROP for v1** — investigate engine_3's behavior clean first; old
+  detectors/patterns may be re-added later only if attribution justifies them.
+- **Sentiment + News:** **KEEP** — port the `News` model + sentiment pipeline as an optional
+  engine_3 feature/filter (it can help; informationally different from price).
+- **Visibility:** repo **Public for now**; flip to Private before anything sensitive
+  (methodology/trade logic, any capital detail) goes in. API keys stay gitignored.
