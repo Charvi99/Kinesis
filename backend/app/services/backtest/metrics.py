@@ -55,3 +55,19 @@ def regime_sharpe(ret: pd.Series, bear_mask: pd.Series, bull_mask: pd.Series) ->
         "bear_sharpe": summarize(ret[bear_mask])["sharpe"] if bear_mask.sum() else float("nan"),
         "bull_sharpe": summarize(ret[bull_mask])["sharpe"] if bull_mask.sum() else float("nan"),
     }
+
+
+def trade_stats(trades: list) -> Dict:
+    """Exit-trade stats: hit rate, avg win/loss, payoff (avg_win/avg_loss). The
+    numbers that show whether the trailing stop created the asymmetric payoff."""
+    if not trades:
+        return {"n": 0, "win_rate": float("nan"), "avg_win": float("nan"),
+                "avg_loss": float("nan"), "payoff": float("nan")}
+    rets = [t["ret"] for t in trades]
+    wins = [r for r in rets if r > 0]; losses = [r for r in rets if r <= 0]
+    aw = sum(wins) / len(wins) if wins else 0.0
+    al = abs(sum(losses) / len(losses)) if losses else 0.0
+    return {
+        "n": len(rets), "win_rate": len(wins) / len(rets),
+        "avg_win": aw, "avg_loss": al, "payoff": (aw / al) if al > 0 else float("inf"),
+    }

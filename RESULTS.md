@@ -33,3 +33,30 @@ for cleaner cross-sectional ranking (57 → Russell-1000-style breadth), and (b)
 the thesis from `docs/EDUCATION_AND_EDGE.md`.
 
 Re-run: `docker exec kinesis_backend python /app/scripts/validate_engine.py`
+
+## engine_3 proper — ATR trailing-stop risk layer (A/B, 2026-07-26)
+
+Added the thesis's risk layer: trailing stop (exit if `price < high − k·ATR`) +
+re-entry lockout (the lockout is essential — without it the stopped name re-enters
+next day and the exit is portfolio-neutral; verified). A/B vs v0 (no stops), same
+57-stock universe, daily rebalance, top-N=10:
+
+| k | total% | Sharpe | maxDD% | payoff | win-rate |
+|---|---|---|---|---|---|
+| v0 (no stop) | 112.3 | **0.88** | −22.1 | — | — |
+| k=3 | 24.8 | 0.40 | −17.2 | 1.83 | 0.43 |
+| k=4 | 54.2 | 0.66 | −15.3 | 1.98 | 0.42 |
+| k=5 | 65.2 | 0.72 | **−14.2** | 1.83 | 0.44 |
+| k=8 | 67.1 | 0.68 | −17.8 | 2.05 | 0.42 |
+
+**Verdict: the risk layer trades return for drawdown — it does NOT improve risk-
+adjusted return.** The trailing stop reliably cuts max drawdown (−22% → −14..−18%)
+and produces the predicted asymmetric payoff (~1.8–2.0: avg win 6% vs avg loss 3%),
+**but** the re-entry lockout keeps the engine out of *winners that pulled back then
+resumed*, and that opportunity cost outweighs the cut-loser benefit → lower Sharpe at
+every k. You can have lower DD *or* higher Sharpe, not both.
+
+**Honest conclusion:** on this universe the ATR trailing stop is a **risk dial, not an
+alpha source** — consistent with the broader finding that large-cap daily momentum's
+marginal edge isn't rescued by the risk layer. The genuine levers remain: a **broader
+universe** (the seed fix is the prerequisite) and/or a **less-efficient market**.
