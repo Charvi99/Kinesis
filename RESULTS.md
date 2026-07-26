@@ -60,3 +60,24 @@ every k. You can have lower DD *or* higher Sharpe, not both.
 alpha source** — consistent with the broader finding that large-cap daily momentum's
 marginal edge isn't rescued by the risk layer. The genuine levers remain: a **broader
 universe** (the seed fix is the prerequisite) and/or a **less-efficient market**.
+
+## Universe-size A/B — breadth done right HELPS (2026-07-26)
+
+engine_3 v0 (rank-drop, regime-gated, vol-scaled, daily) across universes, 5y:
+
+| universe | n | Sharpe | total% | maxDD% | PSR0 |
+|---|---|---|---|---|---|
+| curated mega-caps | 57 | 0.88 | 112 | −22 | 0.89 |
+| alphabetical Polygon (biased, A-letter) | 300 | 0.52 | 81 | −39 | 0.81 |
+| **S&P 500 (representative liquid)** | **312** | **1.02** | **260** | −33 | 0.88 |
+
+**The breadth thesis holds — when the universe is representative and liquid.** More
+names to rank sharpens the cross-sectional selection (Sharpe 0.88 → 1.02, return
+112% → 260%). The earlier "broad was worse" was an artifact of the alphabetical
+Polygon sample (A–AZ tickers + junk/SPACs), NOT real breadth. The S&P 500 set is the
+correct universe for US large-cap momentum.
+
+**Caveats (honest):** PSR0 0.88 is still < 0.95 (economically strong, statistically
+suggestive — not a slam-dunk); maxDD −33% is the weakness (the 2022 bear draws the
+whole market down despite the regime gate — the one bear in-sample). The ATR trailing
+stop remains net-negative (Sharpe 0.14 here) — it's a risk dial, not alpha.
