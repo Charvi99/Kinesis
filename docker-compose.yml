@@ -1,0 +1,52 @@
+# Kinesis — momentum-selection trading system.
+# Step 1 skeleton: database + backend only (boots, /health responds).
+# redis / celery_worker / celery_beat / frontend are added in later port steps
+# (3: data pipeline, 7: ledger, 8: frontend) once their task modules exist.
+# Ports shifted off StockAnalyzer's (5432/8080/3000/7379) so both stacks can coexist.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  database:
+    image: timescale/timescaledb:latest-pg14
+    container_name: kinesis_db
+    environment:
+      POSTGRES_DB: kinesis
+      POSTGRES_USER: kinesisuser
+      POSTGRES_PASSWORD: kinesypass123
+    ports:
+      - "5433:5432"
+    volumes:
+      - kinesis_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kinesisuser -d kinesis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kinesis_backend
+    logging: *default-logging
+    environment:
+      DATABASE_URL: postgresql://kinesisuser:kinesypass123@database:5432/kinesis
+      PYTHONUNBUFFERED: 1
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-demo}
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  kinesis_postgres:
