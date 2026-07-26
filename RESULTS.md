@@ -81,3 +81,19 @@ correct universe for US large-cap momentum.
 suggestive — not a slam-dunk); maxDD −33% is the weakness (the 2022 bear draws the
 whole market down despite the regime gate — the one bear in-sample). The ATR trailing
 stop remains net-negative (Sharpe 0.14 here) — it's a risk dial, not alpha.
+
+## Walk-forward OOS on S&P 500 (train 2021-23 incl bear; test 2024-26 held out)
+
+| top_n | train Sharpe | TEST Sharpe | test total | test maxDD |
+|---|---|---|---|---|
+| 10 | 0.45 | **1.35** | +215% | −33% |
+| 20 | 0.49 | **1.37** | +170% | −31% |
+| 30 | 0.48 | 1.29 | +121% | −29% |
+
+**Honest read:** engine_3 is a **bull-participation system** — strong in the held-out
+2024-26 bull (test Sharpe ~1.35) but modest through the 2021-23 bear half (train ~0.45).
+That's consistent with the entire investigation: momentum on large-caps is bull-beta,
+not all-regime alpha. It is a genuinely profitable *bull* momentum strategy (+260%/5y,
+Sharpe 1.02) with one clear, honest limitation: **bear exposure / −33% max drawdown.**
+The next real lever is a *bear-defense* that doesn't cost the bull (the ATR trailing
+stop failed this — it cut the bull too).
