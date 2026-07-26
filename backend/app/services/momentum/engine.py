@@ -28,6 +28,7 @@ class MomentumEngine:
         self.held: Dict = {}
         self.lockout: Dict = {}   # sid -> date until which re-entry is blocked
         self.trades: List[Dict] = []
+        self._atr = {sid: _atr_proxy(closes[sid]) for sid in closes.columns}  # precompute once
 
     def step(self, date) -> pd.Series:
         target = self.W.loc[date]
@@ -40,7 +41,7 @@ class MomentumEngine:
                 continue
             px = float(close[sid]); pos = self.held[sid]
             pos["high"] = max(pos["high"], px)
-            atr = float(_atr_proxy(self.closes[sid].loc[:date]).iloc[-1])
+            atr = float(self._atr[sid].get(date, float("nan")))
             reason = None
             if atr and atr > 0 and px < pos["high"] - self.k * atr:
                 reason = "stop"

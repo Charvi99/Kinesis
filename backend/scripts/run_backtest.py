@@ -13,7 +13,7 @@ def main():
     db = SessionLocal()
     try:
         q = text("""SELECT p.stock_id, p.timestamp, p.close FROM stock_prices p
-                   JOIN stocks s ON s.id=p.stock_id WHERE p.timeframe='1d' ORDER BY p.timestamp""")
+                   JOIN stocks s ON s.id=p.stock_id WHERE p.timeframe='1d' AND s.is_tracked = true ORDER BY p.timestamp""")
         rows = db.execute(q).all()
     finally:
         db.close()

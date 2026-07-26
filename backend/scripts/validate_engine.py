@@ -17,7 +17,7 @@ def load_closes():
     db = SessionLocal()
     try:
         rows = db.execute(text("""SELECT p.stock_id, p.timestamp, p.close FROM stock_prices p
-                                  JOIN stocks s ON s.id=p.stock_id WHERE p.timeframe='1d'
+                                  JOIN stocks s ON s.id=p.stock_id WHERE p.timeframe='1d' AND s.is_tracked = true
                                   ORDER BY p.timestamp""")).all()
     finally:
         db.close()
