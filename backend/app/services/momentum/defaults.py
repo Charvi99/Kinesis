@@ -17,7 +17,7 @@ MAX_WEIGHT = 0.10         # single-name gross cap
 REGIME_GATE = True        # go flat when market < 200d MA
 
 # Bear defense (backtest/defend.py::backtest_momentum_defended)
-TARGET_PORT_VOL = 0.15    # portfolio vol target (de-gross when realized vol spikes)
+TARGET_PORT_VOL = 0.22  # tuned 2026-07-27 on clean data (was 0.15; over-defended -> Sharpe 0.65).
 DD_THRESHOLD = 0.12       # drawdown backstop: scale *de_gross if DD past high exceeds this
 DE_GROSS = 0.50           # exposure multiplier under the drawdown backstop
 LEVERAGE_CAP = 1.0        # never scale above 1x even if realized vol < target
