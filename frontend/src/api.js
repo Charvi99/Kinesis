@@ -19,6 +19,7 @@ export const runBacktest = async (payload) => (await api.post('/backtest', paylo
 // Engines (named, persisted configs). The deployed one is the system's source of truth.
 export const listEngines = async () => (await api.get('/engines')).data;
 export const getEngine = async (id) => (await api.get(`/engines/${id}`)).data;
+export const getEngineCurves = async () => (await api.get('/engines/curves')).data;
 export const createEngine = async (payload) => (await api.post('/engines', payload)).data;
 export const updateEngine = async (id, payload) => (await api.patch(`/engines/${id}`, payload)).data;
 export const deleteEngine = async (id) => (await api.delete(`/engines/${id}`)).data;

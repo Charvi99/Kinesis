@@ -1,10 +1,14 @@
-import { useState } from 'react';
-import { createEngine, deleteEngine, deployEngine, listEngines, updateEngine } from '../api';
+import { useMemo, useState } from 'react';
+import { createEngine, deleteEngine, deployEngine, getEngineCurves, listEngines, updateEngine } from '../api';
 import { useQuery } from '../hooks/useQuery';
 import EngineForm from '../components/EngineForm';
 import EngineDetail from '../components/EngineDetail';
+import EquityChart from '../components/EquityChart';
 import { ErrorState, EmptyState, Spinner } from '../components/States';
+import { CHART } from '../chartTheme';
 import { fmtNum, fmtPct, fmtPctSigned, fmtDate } from '../format';
+
+const PALETTE = ['#7c3aed', '#2563eb', '#d97706', '#db2777', '#0ea5e9', '#65a30d'];
 
 function summary(e) {
   return `top${e.top_n} · ${e.lookback}d · pvol ${Number(e.target_port_vol).toFixed(2)}${e.defended ? '' : ' · no-def'}`;
@@ -21,6 +25,7 @@ function MetricMini({ label, value, tone }) {
 
 export default function EnginesView() {
   const { data, error, loading, refetch } = useQuery(listEngines, []);
+  const { data: curves, loading: curvesLoading } = useQuery(getEngineCurves, []);
   const [editing, setEditing] = useState(null);
   const [detail, setDetail] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -46,6 +51,25 @@ export default function EnginesView() {
     else if (kind === 'delete') { if (window.confirm(`Delete engine “${e.name}”?`)) act(() => deleteEngine(e.id)); }
   };
 
+  // merge every engine's curve into one date-keyed dataset for the overlay
+  const merged = useMemo(() => {
+    if (!curves?.length) return [];
+    const byDate = new Map();
+    curves.forEach((c) => c.curve.forEach((p) => {
+      const row = byDate.get(p.date) || { date: p.date };
+      row[c.name] = p.equity;
+      byDate.set(p.date, row);
+    }));
+    return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+  }, [curves]);
+  const series = useMemo(() => {
+    if (!curves) return [];
+    let pi = 0;
+    return curves.map((c) => c.is_deployed
+      ? { key: c.name, name: `${c.name} · deployed`, color: CHART.equity, width: 2.5 }
+      : { key: c.name, name: c.name, color: PALETTE[pi++ % PALETTE.length], width: 1.8 });
+  }, [curves]);
+
   return (
     <div className="view">
       <div className="view-head row between">
@@ -55,6 +79,16 @@ export default function EnginesView() {
         </div>
         <button className="btn btn--primary" onClick={() => setEditing({ mode: 'new', initial: null })} disabled={busy}>+ New engine</button>
       </div>
+
+      {curvesLoading ? (
+        <div className="card" style={{ marginBottom: 16 }}><Spinner label="Backtesting all engines…" /></div>
+      ) : merged.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-title">Equity comparison · all engines</div>
+          <EquityChart data={merged} series={series} height={300} />
+          <p className="note">Each line is one engine's backtested equity from the same starting capital. The deployed engine is the thick teal line.</p>
+        </div>
+      )}
 
       {actErr && <ErrorState message={actErr} />}
       {editing && (
@@ -96,7 +130,6 @@ export default function EnginesView() {
           })}
         </div>
       )}
-      <p className="note">Click a card to see full risk numbers, the equity curve, and the config. Clone = “create from” an existing engine. Deploying busts the Dashboard cache so it follows immediately.</p>
 
       {detail && <EngineDetail engine={detail} onClose={() => setDetail(null)} onAction={onDetailAction} />}
     </div>

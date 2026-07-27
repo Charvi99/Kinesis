@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, load_closes
 from app.api.schemas import EngineCreate, EngineOut, EngineUpdate
 from app.models.engine import Engine
-from app.services.momentum.engines import metrics_for_engine, seed_default_engine
+from app.services.momentum.engines import backtest_for_engine, metrics_for_engine, seed_default_engine
 
 router = APIRouter(prefix="/api/v1/engines", tags=["engines"])
 
@@ -52,6 +52,30 @@ def list_engines(db: Session = Depends(get_db)):
     rows = db.query(Engine).order_by(Engine.is_deployed.desc(), Engine.id).all()
     return [_out(_ensure_metrics(db, e)) for e in rows]
 
+
+@router.get("/curves", response_model=list)
+def engine_curves(db: Session = Depends(get_db)):
+    """Every engine's backtested equity path (downsampled) for the Engines comparison
+    overlay. Runs one backtest per engine (few engines; cache later if this grows)."""
+    import numpy as np
+    import pandas as pd
+    if db.query(Engine).count() == 0:
+        seed_default_engine(db)
+    engines = db.query(Engine).order_by(Engine.is_deployed.desc(), Engine.id).all()
+    closes = load_closes(db)
+    out = []
+    for e in engines:
+        daily = backtest_for_engine(closes, e)["daily_returns"]
+        eq = (1 + daily.fillna(0.0)).cumprod() * float(e.starting_cash or 100_000.0)
+        if len(eq) > 200:
+            step = int(np.ceil(len(eq) / 200))
+            eq = pd.concat([eq.iloc[::step], eq.iloc[[-1]]]).drop_duplicates()
+        out.append({
+            "name": e.name, "is_deployed": e.is_deployed,
+            "curve": [{"date": d.strftime("%Y-%m-%d"), "equity": round(float(v), 2)}
+                      for d, v in zip(eq.index, eq)],
+        })
+    return out
 
 @router.get("/{engine_id}", response_model=EngineOut)
 def get_engine(engine_id: int, db: Session = Depends(get_db)):
@@ -121,6 +145,8 @@ def deploy_engine(engine_id: int, db: Session = Depends(get_db)):
     _ensure_metrics(db, eng)
     _invalidate_state_cache()
     return _out(eng)
+
+
 
 
 @router.post("/{engine_id}/refresh", response_model=EngineOut)
