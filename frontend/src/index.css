@@ -305,9 +305,10 @@ tr.held:hover td { background: #e6fbf6; }
 
 /* ── engine card grid ─────────────────────────────────────── */
 .engine-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: var(--space-4); align-items: start; }
-.engine-card { display: flex; flex-direction: column; gap: 10px; }
-.engine-card--deployed { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow-md); }
+.engine-card { display: flex; flex-direction: column; gap: 10px; border-left: 4px solid var(--border); }
+.engine-card--deployed { box-shadow: var(--shadow-md); }
 .engine-card-head { align-items: center; }
+.engine-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .engine-name { font-size: var(--fs-lg); }
 .engine-desc { font-size: var(--fs-md); color: var(--ink-soft); margin: -4px 0 0; line-height: 1.4; }
 .engine-metrics {

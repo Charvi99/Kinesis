@@ -49,7 +49,7 @@ export default function EquityChart({ data, height = 300, series, legend }) {
           <Tooltip content={<Tip />} />
           {useSeries.map((s) => (
             <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color}
-                  strokeWidth={s.width || 2.5} dot={false} connectNulls />
+                  strokeWidth={s.width || 2.5} strokeDasharray={s.dash} dot={false} connectNulls />
           ))}
         </LineChart>
       </ResponsiveContainer>

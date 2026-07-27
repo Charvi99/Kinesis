@@ -55,26 +55,41 @@ def list_engines(db: Session = Depends(get_db)):
 
 @router.get("/curves", response_model=list)
 def engine_curves(db: Session = Depends(get_db)):
-    """Every engine's backtested equity path (downsampled) for the Engines comparison
-    overlay. Runs one backtest per engine (few engines; cache later if this grows)."""
-    import numpy as np
+    """Every engine's backtested equity path + a benchmark, on a COMMON date axis so
+    the chart tooltip always shows every series (independent per-engine downsampling
+    was leaving gaps). Curves are scaled to a fixed $100k baseline so they're
+    comparable. Downsampled to ~200 shared dates."""
+    import math
     import pandas as pd
+    from app.api.deps import spy_series
     if db.query(Engine).count() == 0:
         seed_default_engine(db)
     engines = db.query(Engine).order_by(Engine.is_deployed.desc(), Engine.id).all()
     closes = load_closes(db)
-    out = []
+    base = 100_000.0
+
+    cols = {}
     for e in engines:
         daily = backtest_for_engine(closes, e)["daily_returns"]
-        eq = (1 + daily.fillna(0.0)).cumprod() * float(e.starting_cash or 100_000.0)
-        if len(eq) > 200:
-            step = int(np.ceil(len(eq) / 200))
-            eq = pd.concat([eq.iloc[::step], eq.iloc[[-1]]]).drop_duplicates()
-        out.append({
-            "name": e.name, "is_deployed": e.is_deployed,
-            "curve": [{"date": d.strftime("%Y-%m-%d"), "equity": round(float(v), 2)}
-                      for d, v in zip(eq.index, eq)],
-        })
+        cols[e.name] = (1.0 + daily.fillna(0.0)).cumprod() * base
+    # benchmark = SPY if tracked, else the equal-weight market index the regime gate uses
+    spy = spy_series(db, closes).pct_change().fillna(0.0)
+    cols["Benchmark"] = (1.0 + spy).cumprod() * base
+
+    # align every series to one common date axis (union), fill gaps
+    all_idx = sorted(set().union(*[c.index for c in cols.values()]))
+    df = pd.DataFrame({k: c.reindex(all_idx).ffill().bfill() for k, c in cols.items()}, index=all_idx)
+    if len(df) > 200:
+        step = int(math.ceil(len(df) / 200))
+        df = pd.concat([df.iloc[::step], df.iloc[[-1]]]).drop_duplicates()
+
+    def pts(col):
+        return [{"date": d.strftime("%Y-%m-%d"), "equity": round(float(v), 2)}
+                for d, v in zip(df.index, df[col])]
+
+    out = [{"name": e.name, "is_deployed": e.is_deployed, "is_benchmark": False, "curve": pts(e.name)}
+           for e in engines]
+    out.append({"name": "Benchmark", "is_deployed": False, "is_benchmark": True, "curve": pts("Benchmark")})
     return out
 
 @router.get("/{engine_id}", response_model=EngineOut)
