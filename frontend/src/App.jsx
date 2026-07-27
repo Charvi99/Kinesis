@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import { checkHealth } from './api';
 import DashboardView from './views/DashboardView';
+import LabView from './views/LabView';
+import EnginesView from './views/EnginesView';
 import SelectionView from './views/SelectionView';
 import TradesView from './views/TradesView';
-import BacktestLabView from './views/BacktestLabView';
-import ConfigView from './views/ConfigView';
 
-const TABS = [
+// Primary tabs = what you actually use. Selection/Trades are demoted (model-tagged):
+// they show backtest-derived data until the live ledger lands, then they become live.
+const PRIMARY = [
   { id: 'dashboard', label: 'Dashboard', el: DashboardView },
+  { id: 'lab', label: 'Lab', el: LabView },
+  { id: 'engines', label: 'Engines', el: EnginesView },
+];
+const MODEL = [
   { id: 'selection', label: 'Selection', el: SelectionView },
   { id: 'trades', label: 'Trades', el: TradesView },
-  { id: 'backtest', label: 'Backtest lab', el: BacktestLabView },
-  { id: 'config', label: 'Config', el: ConfigView },
 ];
 
 export default function App() {
@@ -26,7 +30,7 @@ export default function App() {
     return () => { on = false; };
   }, []);
 
-  const Active = TABS.find((t) => t.id === tab).el;
+  const Active = [...PRIMARY, ...MODEL].find((t) => t.id === tab).el;
   const ok = health?.status === 'ok';
 
   return (
@@ -45,9 +49,15 @@ export default function App() {
           </div>
         </div>
         <nav className="tabs">
-          {TABS.map((t) => (
+          {PRIMARY.map((t) => (
             <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
               {t.label}
+            </button>
+          ))}
+          <span className="tab-sep" />
+          {MODEL.map((t) => (
+            <button key={t.id} className={`tab tab--model ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+              {t.label} <span className="tab-tag">model</span>
             </button>
           ))}
         </nav>

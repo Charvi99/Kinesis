@@ -49,9 +49,14 @@ export default function SelectionView() {
 
   return (
     <div className="view">
-      <div className="view-head">
-        <h2>Selection ranking</h2>
-        <p className="tag-asof">Universe ranked by 252-day momentum; top-{data?.filter((x) => x.held).length || '?'} held, vol-scaled. Current target portfolio, as-of now.</p>
+      <div className="view-head row between">
+        <div>
+          <h2>Selection ranking <span className="badge badge--model">model</span></h2>
+          <p className="tag-asof">Universe ranked by 252-day momentum; top-{data?.filter((x) => x.held).length || '?'} held, vol-scaled. Current target portfolio, as-of now.</p>
+        </div>
+        <span className="faint" style={{ maxWidth: 280, textAlign: 'right', fontSize: 12 }}>
+          Backtest-derived target book — not a live position list until the ledger goes live.
+        </span>
       </div>
       <div className="card">
         <div className="row between" style={{ marginBottom: 12 }}>

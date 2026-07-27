@@ -73,6 +73,11 @@ button { font-family: inherit; }
 }
 .tab:hover { color: var(--ink); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-sep { width: 1px; align-self: center; height: 18px; background: var(--border); margin: 0 6px; }
+.tab--model { color: var(--ink-faint); }
+.tab--model.active { color: var(--warn); border-bottom-color: var(--warn); }
+.tab-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--warn); background: var(--warn-soft); padding: 1px 5px; border-radius: 999px; margin-left: 6px; }
 
 .view { padding-top: 24px; }
 .view-head { margin-bottom: 16px; }
@@ -127,6 +132,7 @@ button { font-family: inherit; }
 .badge--drop { color: #b91c1c; background: var(--neg-soft); }
 .badge--held { color: var(--ink-soft); background: #eef2f6; }
 .badge--neutral { color: var(--ink-soft); background: #eef2f6; }
+.badge--model { color: var(--warn); background: var(--warn-soft); }
 .badge--reason-rank_drop { color: var(--ink-soft); background: #eef2f6; }
 .badge--reason-defense { color: var(--warn); background: var(--warn-soft); }
 

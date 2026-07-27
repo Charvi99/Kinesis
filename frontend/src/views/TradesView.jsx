@@ -12,9 +12,14 @@ export default function TradesView() {
   const { data, error, loading, refetch } = useQuery(() => getTrades(200), []);
   return (
     <div className="view">
-      <div className="view-head">
-        <h2>Trades log</h2>
-        <p className="tag-asof">Closed round-trips derived from the selection's weight history. Reason <em>defense</em> = a regime flatten; <em>rank_drop</em> = fell out of the top-N. Most recent first.</p>
+      <div className="view-head row between">
+        <div>
+          <h2>Trades log <span className="badge badge--model">model</span></h2>
+          <p className="tag-asof">Closed round-trips derived from the selection's weight history. Reason <em>defense</em> = a regime flatten; <em>rank_drop</em> = fell out of the top-N. Most recent first.</p>
+        </div>
+        <span className="faint" style={{ maxWidth: 280, textAlign: 'right', fontSize: 12 }}>
+          Derived from weight history — not live fills until the ledger goes live.
+        </span>
       </div>
       <div className="card">
         {loading ? <Spinner /> : error ? <ErrorState message={error} onRetry={refetch} /> : !data?.length ? <EmptyState>No trades yet.</EmptyState> : (
