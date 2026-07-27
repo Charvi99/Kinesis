@@ -4,6 +4,7 @@ import { useQuery } from '../hooks/useQuery';
 import MetricTile from '../components/MetricTile';
 import EquityChart from '../components/EquityChart';
 import SweepChart from '../components/SweepChart';
+import SweepOverlay from '../components/SweepOverlay';
 import CompareScorecard from '../components/CompareScorecard';
 import { ErrorState, Spinner } from '../components/States';
 import { KNOBS, KNOB_BY_KEY, SWEEPABLE } from '../knobs';
@@ -45,7 +46,7 @@ export default function LabView() {
     <div className="view">
       <div className="view-head">
         <h2>Lab</h2>
-        <p>Explore how the knobs move the result. Single = one run; Sweep = one knob across a range; Compare = two engines side by side.</p>
+        <p>Explore how the knobs move the result. Single = one run; Sweep = one knob across a range (see the equity paths move); Compare = two engines side by side.</p>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -127,8 +128,8 @@ function SingleRun({ engines, baseId, setBaseId }) {
         <>
           <div className="grid grid-tiles" style={{ marginTop: 16 }}>
             <MetricTile label="Total return" value={fmtPctSigned(m.total_return)} tone={m.total_return >= 0 ? 'pos' : 'neg'} />
-            <MetricTile label="Sharpe" value={fmtNum(m.sharpe)} />
-            <MetricTile label="Max drawdown" value={fmtPct(m.max_drawdown)} tone="neg" />
+            <MetricTile label="Sharpe" value={fmtNum(m.sharpe)} sub="vs SPY ≈ 0.69" />
+            <MetricTile label="Max drawdown" value={fmtPct(m.max_drawdown)} tone="neg" sub="vs SPY ≈ −25%" />
             <MetricTile label="Ann return" value={fmtPctSigned(m.ann_return)} />
             <MetricTile label="Ann vol" value={fmtPct(m.ann_vol)} />
             <MetricTile label="PSR0" value={fmtNum(m.psr0)} sub="P(edge>0)" />
@@ -149,29 +150,43 @@ function SweepRun({ engines, baseId, setBaseId }) {
   const [to, setTo] = useState(0.30);
   const [count, setCount] = useState(7);
   const [res, setRes] = useState(null);
+  const [focused, setFocused] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const meta = KNOB_BY_KEY[knobKey];
   useEffect(() => {
     if (!meta) return;
-    setFrom(meta.min); setTo(Math.min(meta.max, meta.min * 3));
+    setFrom(meta.min);
+    setTo(Math.min(meta.max, +(meta.min * 3).toFixed(4)));
   }, [knobKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Default the focus to the swept value closest to the base engine's current value.
+  useEffect(() => {
+    if (!res?.points?.length) { setFocused(null); return; }
+    const target = res.base?.[res.knob];
+    if (target == null) { setFocused(res.points[Math.floor(res.points.length / 2)].value); return; }
+    let best = res.points[0];
+    for (const p of res.points) if (Math.abs(p.value - target) < Math.abs(best.value - target)) best = p;
+    setFocused(best.value);
+  }, [res]);
 
   const run = async (e) => {
     e.preventDefault();
     setLoading(true); setError(null); setRes(null);
     const values = linspace(+from, +to, +count, meta.type === 'int');
-    try {
-      setRes(await runSweep({ engine_id: baseId ?? undefined, knob: knobKey, values }));
-    } catch (err) { setError(err.response?.data?.detail || err.message || 'sweep failed'); }
+    try { setRes(await runSweep({ engine_id: baseId ?? undefined, knob: knobKey, values })); }
+    catch (err) { setError(err.response?.data?.detail || err.message || 'sweep failed'); }
     finally { setLoading(false); }
   };
+
+  const focusedPoint = res?.points?.find((p) => p.value === focused) || null;
+  const fm = focusedPoint?.metrics;
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-title">Sweep a knob</div>
-      <p className="note">Hold everything else fixed; vary one knob and watch Sharpe (green) and max drawdown (red) move. <strong>This is how you learn what a knob does.</strong></p>
+      <p className="note">Hold everything else fixed and vary ONE knob. The overlay shows every equity path — <strong>click a row (or a curve) to focus one value</strong>. Cool lines = low value, warm = high.</p>
       <form onSubmit={run}>
         <div style={{ marginBottom: 12 }}><BaseSelect engines={engines} baseId={baseId} setBaseId={setBaseId} /></div>
         <div className="form-grid">
@@ -188,24 +203,46 @@ function SweepRun({ engines, baseId, setBaseId }) {
         </div>
         {meta && <p className="faint" style={{ fontSize: 12, marginTop: 8 }}>{meta.help}</p>}
         <div style={{ marginTop: 12 }}>
-          <button className="btn btn--primary" disabled={loading}>{loading ? 'Sweeping…' : 'Run sweep'}</button>
+          <button className="btn btn--primary" disabled={loading}>{loading ? 'Sweeping…' : `Run sweep (${Math.max(2, Math.min(12, +count || 7))} backtests)`}</button>
         </div>
       </form>
 
       {error && <div style={{ marginTop: 12 }}><ErrorState message={error} /></div>}
       {loading && <Spinner label="Running a backtest per value…" />}
+
       {res?.points?.length > 0 && (
         <>
-          <div style={{ marginTop: 16 }}><SweepChart points={res.points} knobLabel={`${meta?.label} (${res.knob})`} /></div>
+          {/* Focused "current value" panel */}
+          {fm && (
+            <div className="card" style={{ marginTop: 16, background: '#f0fdfa', borderColor: '#99f6e4' }}>
+              <div className="card-title">Focused · {meta?.label} = {focused}</div>
+              <div className="grid grid-tiles">
+                <MetricTile label="Sharpe" value={fmtNum(fm.sharpe)} sub="vs SPY ≈ 0.69" />
+                <MetricTile label="Max drawdown" value={fmtPct(fm.max_drawdown)} tone="neg" sub="vs SPY ≈ −25%" />
+                <MetricTile label="Total return" value={fmtPctSigned(fm.total_return)} tone={fm.total_return >= 0 ? 'pos' : 'neg'} />
+                <MetricTile label="Ann vol" value={fmtPct(fm.ann_vol)} />
+              </div>
+            </div>
+          )}
+
+          <div className="card-title" style={{ marginTop: 18 }}>Equity paths (compare visually)</div>
+          <SweepOverlay points={res.points} focused={focused} />
+          <p className="note">Each line is one value of the knob. A higher line = more wealth; a line that dips less = smaller drawdown. This is the trade-off the knob buys you.</p>
+
+          <div className="card-title" style={{ marginTop: 18 }}>Sharpe vs drawdown</div>
+          <SweepChart points={res.points} knobLabel={`${meta?.label} (${res.knob})`} />
+          <p className="note">Green = risk-adjusted return (higher is better); red = worst drawdown (closer to 0 is better). The sweet spot balances a high green line with a shallow red line.</p>
+
           <div className="table-wrap" style={{ marginTop: 12 }}>
             <table className="table">
               <thead><tr><th>{meta?.label}</th><th className="right">Sharpe</th><th className="right">Max DD</th><th className="right">Total ret</th><th className="right">Ann vol</th></tr></thead>
               <tbody>
                 {res.points.map((p, i) => {
                   const mm = p.metrics;
+                  const isF = p.value === focused;
                   return (
-                    <tr key={i}>
-                      <td className="num">{p.value}</td>
+                    <tr key={i} className={isF ? 'held' : ''} style={{ cursor: 'pointer' }} onClick={() => setFocused(p.value)}>
+                      <td className="num">{p.value}{isF && ' ◀'}</td>
                       <td className="num right">{fmtNum(mm.sharpe)}</td>
                       <td className="num right neg">{fmtPct(mm.max_drawdown)}</td>
                       <td className={`num right ${mm.total_return >= 0 ? 'pos' : 'neg'}`}>{fmtPctSigned(mm.total_return)}</td>
@@ -216,6 +253,7 @@ function SweepRun({ engines, baseId, setBaseId }) {
               </tbody>
             </table>
           </div>
+          <p className="note">Click any row to focus that value in the chart above.</p>
         </>
       )}
     </div>

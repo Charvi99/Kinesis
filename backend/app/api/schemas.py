@@ -169,6 +169,7 @@ class SweepRequest(BaseModel):
 class SweepPoint(BaseModel):
     value: float
     metrics: MetricSet
+    equity_curve: List[EquityPoint] = []   # for the overlay (compare paths visually)
 
 
 class SweepResponse(BaseModel):

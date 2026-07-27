@@ -214,7 +214,7 @@ def backtest_sweep(req: SweepRequest, db: Session = Depends(get_db)):
         # Reconstruct (not model_copy) so Field ge/le constraints re-validate `val`.
         b = BacktestRequest(**{**base.model_dump(), req.knob: val})
         r = _backtest_from_req(closes, spy_ret, bear_mask, b, defaults.STARTING_CASH)
-        points.append(SweepPoint(value=float(val), metrics=r["metrics"]))
+        points.append(SweepPoint(value=float(val), metrics=r["metrics"], equity_curve=r["equity_curve"]))
     return SweepResponse(knob=req.knob, base=ConfigOut(**engine_to_config_dict(eng)), points=points)
 
 
