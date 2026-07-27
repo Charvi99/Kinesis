@@ -5,6 +5,7 @@ import RegimeBadge from '../components/RegimeBadge';
 import DefenseGauge from '../components/DefenseGauge';
 import EquityChart from '../components/EquityChart';
 import { Spinner, ErrorState } from '../components/States';
+import { tile, verdict } from '../metrics';
 import { fmtMoney, fmtPct, fmtPctSigned, fmtNum } from '../format';
 
 export default function DashboardView() {
@@ -22,6 +23,7 @@ export default function DashboardView() {
           <p className="tag-asof">Model track record · as-of {data.as_of}</p>
         </div>
         <div className="pillrow">
+          <span className="badge badge--model">modeled · not live</span>
           <RegimeBadge regime={data.regime} />
           <span className="badge badge--neutral">Exposure {fmtPct(data.exposure, 0)}</span>
         </div>
@@ -30,15 +32,15 @@ export default function DashboardView() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="grid grid-tiles">
           <MetricTile label="Equity" value={fmtMoney(data.equity)} sub={`from ${fmtMoney(data.starting_cash)}`} />
-          <MetricTile label="Total return" value={fmtPctSigned(m.total_return)} tone={m.total_return >= 0 ? 'pos' : 'neg'} />
-          <MetricTile label="Sharpe" value={fmtNum(m.sharpe)} sub="vs SPY ~0.69" />
-          <MetricTile label="Max drawdown" value={fmtPct(m.max_drawdown)} tone="neg" sub="vs SPY ~−25%" />
-          <MetricTile label="Ann return / vol" value={`${fmtPct(m.ann_return, 1)}`} sub={`vol ${fmtPct(m.ann_vol, 1)}`} />
-          <MetricTile label="PSR0" value={fmtNum(m.psr0)} sub="P(edge > 0)" />
-          <MetricTile label="Bull / bear Sharpe" value={fmtNum(m.bull_sharpe)} sub={`bear ${fmtNum(m.bear_sharpe)}`} />
-          <MetricTile label="Avg turnover" value={fmtNum(m.avg_turnover, 3)} sub={`exposure ${fmtPct(m.avg_exposure, 0)}`} />
+          <MetricTile label="Total return" {...tile('total_return', m.total_return, fmtPctSigned(m.total_return))} />
+          <MetricTile label="Sharpe" {...tile('sharpe', m.sharpe, fmtNum(m.sharpe))} />
+          <MetricTile label="Max drawdown" {...tile('max_drawdown', m.max_drawdown, fmtPct(m.max_drawdown))} />
+          <MetricTile label="Ann return" value={fmtPctSigned(m.ann_return)} sub={`${verdict('ann_return', m.ann_return).label} · vol ${fmtPct(m.ann_vol, 1)}`} tone={verdict('ann_return', m.ann_return).tone} />
+          <MetricTile label="PSR0" {...tile('psr0', m.psr0, fmtNum(m.psr0))} />
+          <MetricTile label="Bull Sharpe" value={fmtNum(m.bull_sharpe)} sub="bull regimes" />
+          <MetricTile label="Bear Sharpe" value={fmtNum(m.bear_sharpe)} sub="bear regimes" tone={m.bear_sharpe < 0 ? 'neg' : ''} />
         </div>
-        <p className="note">Track record is engine_3 <strong>backtested</strong> at production config — there is no live ledger yet, so this is the strategy's modeled equity, not realized paper-trading P&amp;L. (See FRONTEND_DESIGN §4.)</p>
+        <p className="note">Track record is engine_3 <strong>backtested</strong> at the deployed config — there is no live ledger yet, so this is the strategy's modeled equity, not realized paper-trading P&amp;L. The badge above flags it; it flips to <em>live</em> when the ledger ships.</p>
       </div>
 
       <div className="grid grid-2">

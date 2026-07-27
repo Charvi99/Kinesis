@@ -6,8 +6,10 @@ import EquityChart from '../components/EquityChart';
 import SweepChart from '../components/SweepChart';
 import SweepOverlay from '../components/SweepOverlay';
 import CompareScorecard from '../components/CompareScorecard';
+import KnobGroup from '../components/KnobGroup';
 import { ErrorState, Spinner } from '../components/States';
-import { KNOBS, KNOB_BY_KEY, SWEEPABLE } from '../knobs';
+import { GROUPS, KNOB_BY_KEY, SWEEPABLE } from '../knobs';
+import { tile } from '../metrics';
 import { fmtNum, fmtPct, fmtPctSigned } from '../format';
 
 const MODES = [
@@ -15,9 +17,6 @@ const MODES = [
   { id: 'sweep', label: 'Sweep a knob' },
   { id: 'compare', label: 'Compare' },
 ];
-
-// Fields a backtest accepts (everything but starting_cash).
-const BT_KNOBS = KNOBS.filter((k) => k.key !== 'starting_cash');
 
 // Build a backtest payload from any engine-like / config-like object.
 function snapshot(src) {
@@ -27,6 +26,17 @@ function snapshot(src) {
     target_port_vol: +src.target_port_vol, dd_threshold: +src.dd_threshold,
     de_gross: +src.de_gross, leverage_cap: +src.leverage_cap, cost_bps: +src.cost_bps,
     start_date: '', end_date: '',
+  };
+}
+
+// Cast the editable (string) form fields to the numbers the API expects.
+function castForm(form) {
+  return {
+    ...form,
+    lookback: +form.lookback, top_n: +form.top_n, target_vol: +form.target_vol,
+    max_weight: +form.max_weight, target_port_vol: +form.target_port_vol,
+    dd_threshold: +form.dd_threshold, de_gross: +form.de_gross,
+    leverage_cap: +form.leverage_cap, cost_bps: +form.cost_bps,
   };
 }
 
@@ -92,7 +102,7 @@ function SingleRun({ engines, baseId, setBaseId }) {
   const run = async (e) => {
     e.preventDefault();
     setLoading(true); setError(null); setRes(null);
-    const payload = { ...form };
+    const payload = castForm(form);
     if (!payload.start_date) delete payload.start_date;
     if (!payload.end_date) delete payload.end_date;
     try { setRes(await runBacktest(payload)); }
@@ -105,14 +115,13 @@ function SingleRun({ engines, baseId, setBaseId }) {
   return (
     <form className="card" onSubmit={run} style={{ marginBottom: 16 }}>
       <div className="card-title">Single run</div>
-      <div style={{ marginBottom: 12 }}><BaseSelect engines={engines} baseId={baseId} setBaseId={setBaseId} /></div>
-      <div className="form-grid">
-        {BT_KNOBS.map((k) => (
-          <label className="field" key={k.key} title={k.help}>
-            <span>{k.label}{k.unit ? ` (${k.unit})` : ''} <span className="faint">ⓘ</span></span>
-            <input type="number" value={form[k.key]} min={k.min} max={k.max} step={k.step} onChange={(e) => set(k.key, e.target.value)} />
-          </label>
-        ))}
+      <div style={{ marginBottom: 4 }}><BaseSelect engines={engines} baseId={baseId} setBaseId={setBaseId} /></div>
+
+      {GROUPS.map((g) => (
+        <div key={g.title} style={{ marginTop: 14 }}><KnobGroup group={g} values={form} onChange={set} /></div>
+      ))}
+
+      <div className="form-grid" style={{ marginTop: 14 }}>
         <label className="field"><span>Start date (opt)</span>
           <input type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} /></label>
         <label className="field"><span>End date (opt)</span>
@@ -127,14 +136,14 @@ function SingleRun({ engines, baseId, setBaseId }) {
       {m && (
         <>
           <div className="grid grid-tiles" style={{ marginTop: 16 }}>
-            <MetricTile label="Total return" value={fmtPctSigned(m.total_return)} tone={m.total_return >= 0 ? 'pos' : 'neg'} />
-            <MetricTile label="Sharpe" value={fmtNum(m.sharpe)} sub="vs SPY ≈ 0.69" />
-            <MetricTile label="Max drawdown" value={fmtPct(m.max_drawdown)} tone="neg" sub="vs SPY ≈ −25%" />
-            <MetricTile label="Ann return" value={fmtPctSigned(m.ann_return)} />
-            <MetricTile label="Ann vol" value={fmtPct(m.ann_vol)} />
-            <MetricTile label="PSR0" value={fmtNum(m.psr0)} sub="P(edge>0)" />
-            <MetricTile label="Bull Sharpe" value={fmtNum(m.bull_sharpe)} />
-            <MetricTile label="Bear Sharpe" value={fmtNum(m.bear_sharpe)} tone={m.bear_sharpe < 0 ? 'neg' : ''} />
+            <MetricTile label="Total return" {...tile('total_return', m.total_return, fmtPctSigned(m.total_return))} />
+            <MetricTile label="Sharpe" {...tile('sharpe', m.sharpe, fmtNum(m.sharpe))} />
+            <MetricTile label="Max drawdown" {...tile('max_drawdown', m.max_drawdown, fmtPct(m.max_drawdown))} />
+            <MetricTile label="Ann return" {...tile('ann_return', m.ann_return, fmtPctSigned(m.ann_return))} />
+            <MetricTile label="Ann vol" value={fmtPct(m.ann_vol)} sub="lower = smoother" />
+            <MetricTile label="PSR0" {...tile('psr0', m.psr0, fmtNum(m.psr0))} />
+            <MetricTile label="Bull Sharpe" value={fmtNum(m.bull_sharpe)} sub="bull regimes" tone={m.bull_sharpe >= 1 ? 'pos' : ''} />
+            <MetricTile label="Bear Sharpe" value={fmtNum(m.bear_sharpe)} sub="bear regimes" tone={m.bear_sharpe < 0 ? 'neg' : ''} />
           </div>
           <div style={{ marginTop: 16 }}><EquityChart data={res.equity_curve} height={320} /></div>
         </>
@@ -186,7 +195,7 @@ function SweepRun({ engines, baseId, setBaseId }) {
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-title">Sweep a knob</div>
-      <p className="note">Hold everything else fixed and vary ONE knob. The overlay shows every equity path — <strong>click a row (or a curve) to focus one value</strong>. Cool lines = low value, warm = high.</p>
+      <p className="note">Hold everything else fixed and vary ONE knob. The overlay shows every equity path. <strong>Click a Focus pill, a legend swatch, or a table row to choose which value is thick and gets the summary.</strong></p>
       <form onSubmit={run}>
         <div style={{ marginBottom: 12 }}><BaseSelect engines={engines} baseId={baseId} setBaseId={setBaseId} /></div>
         <div className="form-grid">
@@ -212,22 +221,32 @@ function SweepRun({ engines, baseId, setBaseId }) {
 
       {res?.points?.length > 0 && (
         <>
+          {/* Explicit focus selector */}
+          <div className="card-title" style={{ marginTop: 18 }}>Focus which value?</div>
+          <div className="pillrow">
+            {res.points.map((p) => (
+              <button key={p.value} className={`pill ${focused === p.value ? 'pill--active' : ''}`} onClick={() => setFocused(p.value)}>
+                {p.value}
+              </button>
+            ))}
+          </div>
+
           {/* Focused "current value" panel */}
           {fm && (
-            <div className="card" style={{ marginTop: 16, background: '#f0fdfa', borderColor: '#99f6e4' }}>
+            <div className="card focus-panel" style={{ marginTop: 12 }}>
               <div className="card-title">Focused · {meta?.label} = {focused}</div>
               <div className="grid grid-tiles">
-                <MetricTile label="Sharpe" value={fmtNum(fm.sharpe)} sub="vs SPY ≈ 0.69" />
-                <MetricTile label="Max drawdown" value={fmtPct(fm.max_drawdown)} tone="neg" sub="vs SPY ≈ −25%" />
-                <MetricTile label="Total return" value={fmtPctSigned(fm.total_return)} tone={fm.total_return >= 0 ? 'pos' : 'neg'} />
+                <MetricTile label="Sharpe" {...tile('sharpe', fm.sharpe, fmtNum(fm.sharpe))} />
+                <MetricTile label="Max drawdown" {...tile('max_drawdown', fm.max_drawdown, fmtPct(fm.max_drawdown))} />
+                <MetricTile label="Total return" {...tile('total_return', fm.total_return, fmtPctSigned(fm.total_return))} />
                 <MetricTile label="Ann vol" value={fmtPct(fm.ann_vol)} />
               </div>
             </div>
           )}
 
           <div className="card-title" style={{ marginTop: 18 }}>Equity paths (compare visually)</div>
-          <SweepOverlay points={res.points} focused={focused} />
-          <p className="note">Each line is one value of the knob. A higher line = more wealth; a line that dips less = smaller drawdown. This is the trade-off the knob buys you.</p>
+          <SweepOverlay points={res.points} focused={focused} onPick={setFocused} />
+          <p className="note">Each line is one value of the knob. A higher line = more wealth; a line that dips less = smaller drawdown. That dip-vs-height is the trade-off the knob buys you.</p>
 
           <div className="card-title" style={{ marginTop: 18 }}>Sharpe vs drawdown</div>
           <SweepChart points={res.points} knobLabel={`${meta?.label} (${res.knob})`} />
@@ -253,7 +272,6 @@ function SweepRun({ engines, baseId, setBaseId }) {
               </tbody>
             </table>
           </div>
-          <p className="note">Click any row to focus that value in the chart above.</p>
         </>
       )}
     </div>

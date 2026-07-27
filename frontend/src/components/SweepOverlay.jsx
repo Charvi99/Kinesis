@@ -11,7 +11,7 @@ function colorFor(t) {
 // Overlay EVERY swept value's equity curve so you can see how the wealth path
 // changes as you turn the knob — far more legible than two statistics. `focused`
 // (a value) draws that one curve thick and dims the rest.
-export default function SweepOverlay({ points, focused }) {
+export default function SweepOverlay({ points, focused, onPick }) {
   if (!points?.length) return null;
   const sorted = [...points].sort((a, b) => a.value - b.value);
   const rank = new Map(sorted.map((p, i) => [p.value, i]));
@@ -33,10 +33,12 @@ export default function SweepOverlay({ points, focused }) {
     <div className="chart-card">
       <div className="chart-legend" style={{ flexWrap: 'wrap' }}>
         {sorted.map((p) => (
-          <span key={p.value} style={{ opacity: focused != null && focused !== p.value ? 0.4 : 1 }}>
+          <button key={p.value} type="button" className="legend-pick" title="Focus this value"
+                  style={{ opacity: focused != null && focused !== p.value ? 0.45 : 1, fontWeight: focused === p.value ? 700 : 500 }}
+                  onClick={() => onPick && onPick(p.value)}>
             <span className="swatch" style={{ background: colorFor(rank.get(p.value) / denom) }} />
             {p.value}
-          </span>
+          </button>
         ))}
       </div>
       <ResponsiveContainer width="100%" height={340}>

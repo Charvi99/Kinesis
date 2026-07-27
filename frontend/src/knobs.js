@@ -83,3 +83,23 @@ export const PRESETS = [
   { name: 'conservative', note: 'tighter defense, lower DD' },
   { name: 'aggressive', note: 'looser defense, more return' },
 ];
+
+// Knob groups (visual grouping + a one-line "why this matters" + a Learn anchor).
+// Single source of truth for KnobGroup, EngineForm, and the Learn deep-links.
+export const GROUPS = [
+  {
+    title: 'Selection', learn: 'selection',
+    why: 'How names get picked: rank the universe by momentum, hold the top-N, size each for equal risk.',
+    keys: ['lookback', 'top_n', 'target_vol', 'max_weight', 'regime_gate'],
+  },
+  {
+    title: 'Bear defense', learn: 'defense',
+    why: 'Risk overlay: scale total exposure down when portfolio vol spikes or the book draws down.',
+    keys: ['defended', 'target_port_vol', 'dd_threshold', 'de_gross', 'leverage_cap'],
+  },
+  {
+    title: 'Cost & capital', learn: 'cost',
+    why: 'Trading costs (penalize turnover) and starting equity (the chart scale).',
+    keys: ['cost_bps', 'starting_cash'],
+  },
+];

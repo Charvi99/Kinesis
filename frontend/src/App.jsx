@@ -3,6 +3,7 @@ import { checkHealth } from './api';
 import DashboardView from './views/DashboardView';
 import LabView from './views/LabView';
 import EnginesView from './views/EnginesView';
+import LearnView from './views/LearnView';
 import SelectionView from './views/SelectionView';
 import TradesView from './views/TradesView';
 
@@ -12,6 +13,7 @@ const PRIMARY = [
   { id: 'dashboard', label: 'Dashboard', el: DashboardView },
   { id: 'lab', label: 'Lab', el: LabView },
   { id: 'engines', label: 'Engines', el: EnginesView },
+  { id: 'learn', label: 'Learn', el: LearnView },
 ];
 const MODEL = [
   { id: 'selection', label: 'Selection', el: SelectionView },
@@ -21,6 +23,7 @@ const MODEL = [
 export default function App() {
   const [tab, setTab] = useState('dashboard');
   const [health, setHealth] = useState(null);
+  const [learnAnchor, setLearnAnchor] = useState(null);
 
   useEffect(() => {
     let on = true;
@@ -28,6 +31,13 @@ export default function App() {
       .then((h) => on && setHealth(h))
       .catch(() => on && setHealth({ status: 'error' }));
     return () => { on = false; };
+  }, []);
+
+  // Any deep "?" chip dispatches 'kinesis:learn' -> jump to the Learn tab + anchor.
+  useEffect(() => {
+    const h = (e) => { setLearnAnchor(e.detail || null); setTab('learn'); };
+    window.addEventListener('kinesis:learn', h);
+    return () => window.removeEventListener('kinesis:learn', h);
   }, []);
 
   const Active = [...PRIMARY, ...MODEL].find((t) => t.id === tab).el;
@@ -62,7 +72,9 @@ export default function App() {
           ))}
         </nav>
       </header>
-      <main className="app"><Active /></main>
+      <main className="app">
+        {tab === 'learn' ? <LearnView anchor={learnAnchor} /> : <Active />}
+      </main>
     </>
   );
 }
