@@ -9,6 +9,8 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.portfolio import router as portfolio_router
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -34,3 +36,6 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "kinesis-backend"}
+
+
+app.include_router(portfolio_router)

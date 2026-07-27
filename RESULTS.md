@@ -1,5 +1,49 @@
 # Kinesis — engine_3 validation results (2026-07-26)
 
+> ## ⚠️ DATA-QUALITY CORRECTION (2026-07-27)
+>
+> The figures in the original sections below were computed on a price DB containing
+> **7 corrupt tickers** — `META, BNY, COHR, FISV, COR, ECHO, HONA` — renamed/delisted
+> symbols for which the backfill had stored Polygon *placeholder* data: long flat
+> zones (a stale value repeated) that then snapped to reality in a single impossible
+> day (`META` +1395%, `BNY` +1263%, `COHR` −84%). They inflated the results, **above
+> all the defended variant** — the corrupt low-vol flat zones suppressed the
+> portfolio's measured realized vol, so the 15% vol-target applied too little
+> de-grossing and the defense looked "free."
+>
+> **Pipeline fixes applied (backend/app/services/):**
+> - fetcher now passes `adjusted=True, sort="asc"` (consistent split/dividend adjustment);
+> - new `data_quality.py` validator rejects any series with a **>80% single-day move**
+>   or a **≥10-day flat zone**; wired into the backfill (reject + untrack) and a
+>   `scripts/scan_price_quality.py` scanner;
+> - renamed tickers (`META`←`FB`) are recovered via a predecessor-symbol splice;
+> - the backfill upsert is delete-first, so re-backfills leave no stale rows.
+>
+> Universe is now **306 tracked, 0 flagged** (was 312, 7 corrupt). **Re-validated on
+> clean data, 5y (2021-07..2026-07), same engine:**
+>
+> | strategy | total% | annRet% | annVol% | Sharpe | maxDD% |
+> |---|---|---|---|---|---|
+> | equal-weight universe B&H | 70.5 | — | — | 0.74 | −20.7 |
+> | engine_3 **v0** (top-10, no defense) | **250.7** | 29.5 | 29.1 | **1.01** | −32.8 |
+> | +defense `target_port_vol=0.15` *(prior prod)* | 54.7 | 13.0 | 19.9 | 0.65 | **−18.6** |
+> | +defense `target_port_vol=0.25` *(re-tuned)* | 149 | — | — | **1.06** | −21.5 |
+>
+> **Honest revised verdict:**
+> - The momentum **selection is genuinely strong and real** — v0 Sharpe **1.01** vs
+>   equal-weight B&H **0.74** (fresh Polygon data confirms the 2024-26 semis/AI rally
+>   driving it: e.g. LITE +642%, AMAT +185% 252d). The edge is selection, as designed.
+> - The **0.15 vol-target defense is over-tuned on clean data** — it cuts Sharpe to
+>   **0.65 (below B&H)** while improving maxDD only to −18.6%. Loosening to ~0.25
+>   recovers Sharpe ~1.06 at maxDD −21.5%. The original "defense halves DD while
+>   holding Sharpe" was **an artifact of the corrupt low-vol tickers**.
+> - **Open:** re-run the walk-forward / rank-IC / universe-A/B suite on clean data,
+>   and re-tune `target_port_vol` (0.20–0.30 range looks better than 0.15).
+>
+> The sections below are the **original (pre-correction, corrupt-data) record**,
+> retained for traceability.
+
+
 Universe: 57 liquid US large/mid caps, 5y daily (2021-07..2026-07). Backtest = the
 `momentum.selection` portfolio (rank by 252d momentum → top-N → vol-scaled →
 regime-gated, 5bps cost), decision at T close / earned T+1 (no look-ahead).
