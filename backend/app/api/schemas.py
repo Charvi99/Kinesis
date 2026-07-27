@@ -155,6 +155,7 @@ class EngineOut(EngineBase):
     is_deployed: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    metrics: Optional[dict] = None
 
 
 # ── Sweep (one knob across a range) ───────────────────────────────────────────

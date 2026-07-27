@@ -1,12 +1,10 @@
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { fmtMoney } from '../format';
+import { CHART, tickStyle, axisLineProps, gridProps } from '../chartTheme';
 
-// Equity vs benchmark (both scaled to the same starting capital). Borrowed pattern
-// from StockAnalyzer's PaperTradingLedger equity+benchmark overlay.
-//
-// Pass `series=[{key,name,color,width?}]` (and data points carrying those keys) to
-// overlay N curves — used by the Lab's Compare mode. Without it, defaults to the
-// two-line Kinesis-vs-benchmark view.
+// Equity vs benchmark (both scaled to the same starting capital).
+// Pass `series=[{key,name,color,width?}]` to overlay N curves (Lab Compare);
+// without it, defaults to the Kinesis-vs-benchmark two-line view.
 function fmtAxis(n) {
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}k`;
@@ -28,8 +26,8 @@ function Tip({ active, payload, label }) {
 }
 
 const DEFAULT_SERIES = [
-  { key: 'spy', name: 'Benchmark', color: '#94a3b8', width: 1.5 },
-  { key: 'equity', name: 'Kinesis', color: '#0d9488', width: 2 },
+  { key: 'spy', name: 'Benchmark', color: CHART.bench, width: 1.5 },
+  { key: 'equity', name: 'Kinesis', color: CHART.equity, width: 2.5 },
 ];
 
 export default function EquityChart({ data, height = 300, series, legend }) {
@@ -45,13 +43,13 @@ export default function EquityChart({ data, height = 300, series, legend }) {
       </div>
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data} margin={{ top: 6, right: 8, left: 8, bottom: 0 }}>
-          <CartesianGrid stroke="#eef2f6" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} minTickGap={48} />
-          <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} />
+          <CartesianGrid {...gridProps} />
+          <XAxis dataKey="date" tick={tickStyle} tickLine={false} axisLine={axisLineProps} minTickGap={48} />
+          <YAxis tickFormatter={fmtAxis} tick={tickStyle} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} />
           <Tooltip content={<Tip />} />
           {useSeries.map((s) => (
             <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color}
-                  strokeWidth={s.width || 2} dot={false} connectNulls />
+                  strokeWidth={s.width || 2.5} dot={false} connectNulls />
           ))}
         </LineChart>
       </ResponsiveContainer>

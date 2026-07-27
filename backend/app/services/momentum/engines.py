@@ -113,3 +113,27 @@ def seed_default_engine(db: Session) -> None:
         cost_bps=defaults.COST_BPS, starting_cash=defaults.STARTING_CASH,
     ))
     db.commit()
+
+
+# ── cached metrics (for the Engines grid) ────────────────────────────────────
+def _fin(v):
+    import math
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+# Keys cached on the Engine row for the Engines card grid (Sharpe/DD/return).
+_METRIC_KEYS = ["sharpe", "max_drawdown", "total_return", "ann_return", "ann_vol",
+                "psr0", "bull_sharpe", "bear_sharpe"]
+
+
+def metrics_for_engine(closes, eng) -> dict:
+    """Run this engine's backtest and trim to the metrics the grid shows. The
+    route caches the result on eng.metrics so list/get stay fast."""
+    m = backtest_for_engine(closes, eng)["metrics"]
+    return {k: _fin(m.get(k)) for k in _METRIC_KEYS}

@@ -1,23 +1,19 @@
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { fmtMoney } from '../format';
+import { tickStyle, axisLineProps, gridProps } from '../chartTheme';
 
-// Color each swept value teal(170°)->red(0°) across the range, so the legend/curve
-// order is intuitive (cool = low value, warm = high value).
+// Color each swept value teal(170°)->red(0°) across the range (cool=low, warm=high).
 function colorFor(t) {
   const hue = 170 - Math.max(0, Math.min(1, t)) * 170;
   return `hsl(${hue.toFixed(0)}, 70%, 45%)`;
 }
 
-// Overlay EVERY swept value's equity curve so you can see how the wealth path
-// changes as you turn the knob — far more legible than two statistics. `focused`
-// (a value) draws that one curve thick and dims the rest.
 export default function SweepOverlay({ points, focused, onPick }) {
   if (!points?.length) return null;
   const sorted = [...points].sort((a, b) => a.value - b.value);
   const rank = new Map(sorted.map((p, i) => [p.value, i]));
   const denom = Math.max(1, sorted.length - 1);
 
-  // Merge all curves into one dataset keyed by date.
   const byDate = new Map();
   points.forEach((p) => {
     const key = String(p.value);
@@ -43,9 +39,9 @@ export default function SweepOverlay({ points, focused, onPick }) {
       </div>
       <ResponsiveContainer width="100%" height={340}>
         <LineChart data={data} margin={{ top: 6, right: 10, left: 4, bottom: 0 }}>
-          <CartesianGrid stroke="#eef2f6" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} minTickGap={48} />
-          <YAxis tickFormatter={(v) => (v >= 1e3 ? `$${(v / 1e3).toFixed(0)}k` : `$${v}`)} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} />
+          <CartesianGrid {...gridProps} />
+          <XAxis dataKey="date" tick={tickStyle} tickLine={false} axisLine={axisLineProps} minTickGap={48} />
+          <YAxis tickFormatter={(v) => (v >= 1e3 ? `$${(v / 1e3).toFixed(0)}k` : `$${v}`)} tick={tickStyle} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} />
           <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)' }} formatter={(v) => fmtMoney(v)} />
           {points.map((p) => {
             const t = rank.get(p.value) / denom;

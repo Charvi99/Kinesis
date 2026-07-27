@@ -25,6 +25,12 @@
   --radius-sm: 6px;
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  /* v3 design tokens */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 15px; --fs-xl: 18px; --fs-2xl: 24px; --fs-3xl: 32px;
+  --radius-lg: 14px;                 /* concentric: outer card = inner control + padding */
+  /* chart palette (used by EquityChart/SweepChart/SweepOverlay) */
+  --c-equity: #0d9488; --c-bench: #94a3b8; --c-grid: #eef2f6; --axis-ink: #475569;
 
   color-scheme: light;
   font: 14px/1.5 var(--sans);
@@ -75,9 +81,9 @@ button { font-family: inherit; }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .tab-sep { width: 1px; align-self: center; height: 18px; background: var(--border); margin: 0 6px; }
 .tab--model { color: var(--ink-faint); }
-.tab--model.active { color: var(--warn); border-bottom-color: var(--warn); }
+.tab--model.active { color: var(--accent); border-bottom-color: var(--accent); }
 .tab-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--warn); background: var(--warn-soft); padding: 1px 5px; border-radius: 999px; margin-left: 6px; }
+  color: var(--ink-soft); background: #eef2f6; padding: 1px 6px; border-radius: 999px; margin-left: 6px; }
 
 .view { padding-top: 24px; }
 .view-head { margin-bottom: 16px; }
@@ -107,7 +113,7 @@ button { font-family: inherit; }
   color: var(--ink-faint); font-weight: 600; }
 .tile-value { font-size: 24px; font-weight: 650; color: var(--ink);
   font-family: var(--mono); line-height: 1.1; }
-.tile-sub { font-size: 11px; color: var(--ink-soft); }
+.tile-sub { font-size: 13px; color: var(--ink-soft); line-height: 1.35; }
 
 /* ── numerics + color ──────────────────────────────────────── */
 .mono { font-family: var(--mono); }
@@ -132,7 +138,7 @@ button { font-family: inherit; }
 .badge--drop { color: #b91c1c; background: var(--neg-soft); }
 .badge--held { color: var(--ink-soft); background: #eef2f6; }
 .badge--neutral { color: var(--ink-soft); background: #eef2f6; }
-.badge--model { color: var(--warn); background: var(--warn-soft); }
+.badge--model { color: var(--ink-soft); background: #eef2f6; }
 .badge--reason-rank_drop { color: var(--ink-soft); background: #eef2f6; }
 .badge--reason-defense { color: var(--warn); background: var(--warn-soft); }
 
@@ -268,3 +274,70 @@ tr.held:hover td { background: #e6fbf6; }
 .learn-grid { display: grid; gap: 16px; }
 .learn-section h3 { font-size: 15px; margin-bottom: 8px; }
 .learn-p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 8px; }
+
+/* ── bento dashboard ──────────────────────────────────────── */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-areas:
+    "hero hero defense"
+    "chart chart chart"
+    "sec sec sec";
+  gap: var(--space-4);
+  align-items: start;
+}
+.bento--hero { grid-area: hero; }
+.bento--defense { grid-area: defense; }
+.bento--chart { grid-area: chart; }
+.bento--sec { grid-area: sec; }
+.tile--hero {
+  font-family: var(--mono); font-size: var(--fs-3xl); font-weight: 700;
+  letter-spacing: -0.02em; line-height: 1.05; margin: 6px 0 2px; color: var(--ink);
+}
+.hero-return { font-family: var(--mono); font-size: var(--fs-xl); font-weight: 650; }
+.hero-return.pos { color: var(--pos); }
+.hero-return.neg { color: var(--neg); }
+.hero-return-sub { font-size: var(--fs-sm); font-weight: 500; color: var(--ink-soft); margin-left: 8px; }
+.bento--hero .tag-asof { margin-top: 10px; }
+@media (max-width: 900px) {
+  .bento { grid-template-columns: 1fr; grid-template-areas: "hero" "defense" "chart" "sec"; }
+}
+
+/* ── engine card grid ─────────────────────────────────────── */
+.engine-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: var(--space-4); align-items: start; }
+.engine-card { display: flex; flex-direction: column; gap: 10px; }
+.engine-card--deployed { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow-md); }
+.engine-card-head { align-items: center; }
+.engine-name { font-size: var(--fs-lg); }
+.engine-desc { font-size: var(--fs-md); color: var(--ink-soft); margin: -4px 0 0; line-height: 1.4; }
+.engine-metrics {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2);
+  padding: 10px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.engine-metric { display: flex; flex-direction: column; gap: 3px; }
+.engine-metric-v { font-family: var(--mono); font-size: var(--fs-xl); font-weight: 650; }
+.engine-config { font-size: var(--fs-sm); }
+.engine-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: auto; padding-top: 4px; }
+.engine-actions .btn { padding: 6px 12px; font-size: var(--fs-sm); }
+.btn--danger { color: var(--neg); border-color: var(--border); }
+.btn--danger:hover { border-color: var(--neg); }
+
+/* ── sub-tabs (lab modes, trades filter) ──────────────────── */
+.subtabs { display: inline-flex; gap: 2px; background: #eef2f6; padding: 3px; border-radius: var(--radius-sm); flex-wrap: wrap; }
+.subtab { appearance: none; border: none; background: transparent; cursor: pointer; padding: 6px 14px;
+  font-size: var(--fs-md); font-weight: 600; color: var(--ink-soft); border-radius: 4px; transition: color .12s, background .12s; }
+.subtab:hover { color: var(--ink); }
+.subtab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+/* ── pagination ───────────────────────────────────────────── */
+.pagination { display: flex; align-items: center; justify-content: center; gap: var(--space-3); margin-top: var(--space-4); }
+.pagination .btn { padding: 6px 14px; }
+
+/* ── collapsed param bar ──────────────────────────────────── */
+.form-collapsed { background: #fbfcfd; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 14px; margin-bottom: var(--space-4); font-size: var(--fs-md); }
+
+/* ── learn article typography ─────────────────────────────── */
+.learn-grid { max-width: 840px; margin: 0 auto; }
+.learn-section h3 { font-size: var(--fs-lg); margin-bottom: var(--space-2); }
+.learn-p { font-size: var(--fs-md); line-height: 1.65; text-wrap: pretty; margin-bottom: 10px; color: var(--ink-soft); }

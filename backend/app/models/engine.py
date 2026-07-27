@@ -5,7 +5,7 @@ The source of truth for the strategy knobs is now a DB row (exactly one Engine i
 See docs/FRONTEND_DESIGN.md and the engines service (momentum/engines.py) for the
 Engine <-> kwargs seam.
 """
-from sqlalchemy import (Boolean, Column, Float, Integer, String, TIMESTAMP, Text)
+from sqlalchemy import (JSON, Boolean, Column, Float, Integer, String, TIMESTAMP, Text)
 from sqlalchemy.sql import func
 
 from app.db.database import Base
@@ -37,6 +37,9 @@ class Engine(Base):
     starting_cash = Column(Float, nullable=False, default=100_000.0)
 
     # ── bookkeeping ──
+    # cached backtest metrics (computed on write; see services/momentum/engines.py)
+    metrics = Column(JSON, nullable=True)
+
     is_deployed = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())

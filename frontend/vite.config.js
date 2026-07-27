@@ -10,6 +10,7 @@ export default defineConfig({
     // Dev proxy: /api -> Kinesis backend (host 8081 -> container 8080), no CORS fuss.
     proxy: {
       '/api': { target: 'http://localhost:8081', changeOrigin: true },
+      '/health': { target: 'http://localhost:8081', changeOrigin: true },
     },
   },
 })

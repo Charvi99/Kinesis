@@ -4,20 +4,26 @@ Exactly one engine is `is_deployed` at a time; that row is the source of truth t
 portfolio routes (/config, /portfolio/state, /selection, /trades) read. Deploying or
 editing busts the portfolio state cache so the Dashboard follows immediately.
 
-Range constraints live on the Pydantic schemas (mirror BacktestRequest), so a saved
-engine is always backtestable.
+Each engine carries a cached `metrics` JSON (Sharpe/DD/etc.) computed on create/update
+and lazily on first read, so the Engines grid can show risk numbers without a live
+backtest per list call. POST /{id}/refresh recomputes (e.g. after a price re-backfill).
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, load_closes
 from app.api.schemas import EngineCreate, EngineOut, EngineUpdate
 from app.models.engine import Engine
-from app.services.momentum.engines import seed_default_engine
+from app.services.momentum.engines import metrics_for_engine, seed_default_engine
 
 router = APIRouter(prefix="/api/v1/engines", tags=["engines"])
+
+# knob keys that change the backtest (=> metrics must be recomputed on update)
+_BACKTEST_KEYS = {"lookback", "top_n", "target_vol", "max_weight", "regime_gate",
+                  "defended", "target_port_vol", "dd_threshold", "de_gross",
+                  "leverage_cap", "cost_bps", "starting_cash"}
 
 
 def _out(eng: Engine) -> EngineOut:
@@ -25,20 +31,26 @@ def _out(eng: Engine) -> EngineOut:
 
 
 def _invalidate_state_cache() -> None:
-    """Bust the portfolio state cache after a config change (lazy import: portfolio
-    routes don't import this module, so no cycle)."""
     from app.api.routes.portfolio import invalidate_state_cache
     invalidate_state_cache()
 
 
+def _ensure_metrics(db: Session, eng: Engine) -> Engine:
+    """Lazily compute + cache metrics on first read (NULL after migration)."""
+    if eng.metrics is None:
+        eng.metrics = metrics_for_engine(load_closes(db), eng)
+        db.commit()
+        db.refresh(eng)
+    return eng
+
+
 @router.get("", response_model=list[EngineOut])
 def list_engines(db: Session = Depends(get_db)):
-    """All engines, deployed first. Auto-seeds `prod` if the table is empty so the UI
-    always shows the baseline config."""
+    """All engines, deployed first. Auto-seeds `prod` if the table is empty."""
     if db.query(Engine).count() == 0:
         seed_default_engine(db)
     rows = db.query(Engine).order_by(Engine.is_deployed.desc(), Engine.id).all()
-    return [_out(e) for e in rows]
+    return [_out(_ensure_metrics(db, e)) for e in rows]
 
 
 @router.get("/{engine_id}", response_model=EngineOut)
@@ -46,7 +58,7 @@ def get_engine(engine_id: int, db: Session = Depends(get_db)):
     eng = db.get(Engine, engine_id)
     if eng is None:
         raise HTTPException(404, f"engine {engine_id} not found")
-    return _out(eng)
+    return _out(_ensure_metrics(db, eng))
 
 
 @router.post("", response_model=EngineOut, status_code=201)
@@ -55,6 +67,9 @@ def create_engine(req: EngineCreate, db: Session = Depends(get_db)):
         raise HTTPException(409, f"engine {req.name!r} already exists")
     eng = Engine(**req.model_dump(), is_deployed=False)
     db.add(eng)
+    db.commit()
+    db.refresh(eng)
+    eng.metrics = metrics_for_engine(load_closes(db), eng)
     db.commit()
     db.refresh(eng)
     return _out(eng)
@@ -74,6 +89,10 @@ def update_engine(engine_id: int, req: EngineUpdate, db: Session = Depends(get_d
         setattr(eng, k, v)
     db.commit()
     db.refresh(eng)
+    if data.keys() & _BACKTEST_KEYS:        # a knob changed -> recompute metrics
+        eng.metrics = metrics_for_engine(load_closes(db), eng)
+        db.commit()
+        db.refresh(eng)
     _invalidate_state_cache()
     return _out(eng)
 
@@ -95,10 +114,22 @@ def deploy_engine(engine_id: int, db: Session = Depends(get_db)):
     eng = db.get(Engine, engine_id)
     if eng is None:
         raise HTTPException(404, f"engine {engine_id} not found")
-    # App-level invariant: exactly one deployed engine.
     db.query(Engine).filter(Engine.is_deployed.is_(True)).update({Engine.is_deployed: False})
     eng.is_deployed = True
     db.commit()
     db.refresh(eng)
+    _ensure_metrics(db, eng)
     _invalidate_state_cache()
+    return _out(eng)
+
+
+@router.post("/{engine_id}/refresh", response_model=EngineOut)
+def refresh_engine(engine_id: int, db: Session = Depends(get_db)):
+    """Recompute cached metrics (e.g. after a price re-backfill)."""
+    eng = db.get(Engine, engine_id)
+    if eng is None:
+        raise HTTPException(404, f"engine {engine_id} not found")
+    eng.metrics = metrics_for_engine(load_closes(db), eng)
+    db.commit()
+    db.refresh(eng)
     return _out(eng)
