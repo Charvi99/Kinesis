@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { checkHealth } from './api';
 import DashboardView from './views/DashboardView';
-import LabView from './views/LabView';
-import EnginesView from './views/EnginesView';
-import LearnView from './views/LearnView';
-import SelectionView from './views/SelectionView';
-import TradesView from './views/TradesView';
 
-// Primary tabs = what you actually use. Selection/Trades are demoted (model-tagged):
-// they show backtest-derived data until the live ledger lands, then they become live.
+const LabView = lazy(() => import('./views/LabView'));
+const EnginesView = lazy(() => import('./views/EnginesView'));
+const LearnView = lazy(() => import('./views/LearnView'));
+const SelectionView = lazy(() => import('./views/SelectionView'));
+const TradesView = lazy(() => import('./views/TradesView'));
+
 const PRIMARY = [
   { id: 'dashboard', label: 'Dashboard', el: DashboardView },
   { id: 'lab', label: 'Lab', el: LabView },
@@ -27,13 +26,9 @@ export default function App() {
 
   useEffect(() => {
     let on = true;
-    checkHealth()
-      .then((h) => on && setHealth(h))
-      .catch(() => on && setHealth({ status: 'error' }));
+    checkHealth().then((h) => on && setHealth(h)).catch(() => on && setHealth({ status: 'error' }));
     return () => { on = false; };
   }, []);
-
-  // Any deep "?" chip dispatches 'kinesis:learn' -> jump to the Learn tab + anchor.
   useEffect(() => {
     const h = (e) => { setLearnAnchor(e.detail || null); setTab('learn'); };
     window.addEventListener('kinesis:learn', h);
@@ -60,9 +55,7 @@ export default function App() {
         </div>
         <nav className="tabs">
           {PRIMARY.map((t) => (
-            <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
+            <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
           ))}
           <span className="tab-sep" />
           {MODEL.map((t) => (
@@ -73,7 +66,9 @@ export default function App() {
         </nav>
       </header>
       <main className="app">
-        {tab === 'learn' ? <LearnView anchor={learnAnchor} /> : <Active />}
+        <Suspense fallback={<div className="state"><div className="spinner" /></div>}>
+          {tab === 'learn' ? <LearnView anchor={learnAnchor} /> : <Active />}
+        </Suspense>
       </main>
     </>
   );

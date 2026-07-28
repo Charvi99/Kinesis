@@ -1,10 +1,8 @@
+import { useState } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { fmtMoney } from '../format';
 import { CHART, tickStyle, axisLineProps, gridProps } from '../chartTheme';
 
-// Equity vs benchmark (both scaled to the same starting capital).
-// Pass `series=[{key,name,color,width?}]` to overlay N curves (Lab Compare);
-// without it, defaults to the Kinesis-vs-benchmark two-line view.
 function fmtAxis(n) {
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}k`;
@@ -25,20 +23,33 @@ function Tip({ active, payload, label }) {
   );
 }
 
+// benchmark dashed gray so it's distinguishable by line style, not color alone
 const DEFAULT_SERIES = [
-  { key: 'spy', name: 'Benchmark', color: CHART.bench, width: 1.5 },
+  { key: 'spy', name: 'Benchmark', color: CHART.bench, width: 1.5, dash: '5 3' },
   { key: 'equity', name: 'Kinesis', color: CHART.equity, width: 2.5 },
 ];
 
-export default function EquityChart({ data, height = 300, series, legend }) {
+export default function EquityChart({ data, height = 300, series, legend, ariaLabel }) {
+  const [hidden, setHidden] = useState(() => new Set());
   if (!data?.length) return null;
   const useSeries = series?.length ? series : DEFAULT_SERIES;
-  const legendItems = legend ?? useSeries.map((s) => ({ name: s.name, color: s.color }));
+  const legendItems = legend ?? useSeries.map((s) => ({ key: s.key, name: s.name, color: s.color }));
+  const visible = useSeries.filter((s) => !hidden.has(s.key));
+  const toggle = (key) => setHidden((prev) => {
+    const n = new Set(prev);
+    if (n.has(key)) n.delete(key); else n.add(key);
+    return n;
+  });
+
   return (
-    <div className="chart-card">
+    <div className="chart-card" role="img" aria-label={ariaLabel || 'equity curve chart — see the data table for exact values'}>
       <div className="chart-legend">
-        {legendItems.map((l, i) => (
-          <span key={i}><span className="swatch" style={{ background: l.color }} /> {l.name}</span>
+        {legendItems.map((l) => (
+          <button key={l.key} type="button" className="legend-toggle"
+                  style={{ opacity: hidden.has(l.key) ? 0.35 : 1, textDecoration: hidden.has(l.key) ? 'line-through' : 'none' }}
+                  onClick={() => toggle(l.key)} title="Toggle series">
+            <span className="swatch" style={{ background: l.color }} /> {l.name}
+          </button>
         ))}
       </div>
       <ResponsiveContainer width="100%" height={height}>
@@ -47,7 +58,7 @@ export default function EquityChart({ data, height = 300, series, legend }) {
           <XAxis dataKey="date" tick={tickStyle} tickLine={false} axisLine={axisLineProps} minTickGap={48} />
           <YAxis tickFormatter={fmtAxis} tick={tickStyle} tickLine={false} axisLine={false} width={48} domain={['auto', 'auto']} />
           <Tooltip content={<Tip />} />
-          {useSeries.map((s) => (
+          {visible.map((s) => (
             <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color}
                   strokeWidth={s.width || 2.5} strokeDasharray={s.dash} dot={false} connectNulls />
           ))}

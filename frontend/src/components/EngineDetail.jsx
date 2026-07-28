@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { runBacktest } from '../api';
 import EquityChart from './EquityChart';
 import MetricTile from './MetricTile';
@@ -27,6 +27,9 @@ export default function EngineDetail({ engine, onClose, onAction }) {
   const [res, setRes] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [leaving, setLeaving] = useState(false);
+  const close = () => { if (leaving) return; setLeaving(true); setTimeout(onClose, 140); };
+  const closeRef = useRef(close); closeRef.current = close;
 
   useEffect(() => {
     let on = true;
@@ -39,7 +42,7 @@ export default function EngineDetail({ engine, onClose, onAction }) {
   }, [engine]);
 
   useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    const h = (e) => { if (e.key === 'Escape') closeRef.current(); };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [onClose]);
@@ -47,14 +50,14 @@ export default function EngineDetail({ engine, onClose, onAction }) {
   const m = res?.metrics || engine.metrics || {};
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-overlay${leaving ? ' modal-overlay--leaving' : ''}`} onClick={close}>
+      <div className={`modal${leaving ? ' modal--leaving' : ''}`} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head row between">
           <div>
             <h3>{engine.name} {engine.is_deployed && <span className="badge badge--held" style={{ marginLeft: 8 }}>deployed</span>}</h3>
             {engine.description && <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>{engine.description}</p>}
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="modal-close" onClick={close} aria-label="Close">✕</button>
         </div>
 
         <div className="modal-body">

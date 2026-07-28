@@ -4,11 +4,14 @@ import { useQuery } from '../hooks/useQuery';
 import EngineForm from '../components/EngineForm';
 import EngineDetail from '../components/EngineDetail';
 import EquityChart from '../components/EquityChart';
+import Skeleton from '../components/Skeleton';
 import { ErrorState, EmptyState, Spinner } from '../components/States';
 import { CHART } from '../chartTheme';
 import { fmtNum, fmtPct, fmtPctSigned, fmtDate } from '../format';
 
 const PALETTE = ['#0d9488', '#7c3aed', '#2563eb', '#d97706', '#db2777', '#0ea5e9', '#65a30d', '#9333ea'];
+// distinct dash patterns so engines differ by line STYLE too, not color alone (colorblind)
+const DASHES = [undefined, '6 3', '2 4', '8 3 2 3', '5 2', '1 3'];
 
 function summary(e) {
   return `top${e.top_n} · ${e.lookback}d · pvol ${Number(e.target_port_vol).toFixed(2)}${e.defended ? '' : ' · no-def'}`;
@@ -40,9 +43,12 @@ export default function EnginesView() {
   }, [curves]);
   const series = useMemo(() => {
     if (!curves) return [];
+    let ei = 0;
     return curves.map((c) => c.is_benchmark
       ? { key: '_benchmark', name: 'Benchmark (S&P 500 ≈ eq-wt market)', color: CHART.bench, width: 1.5, dash: '5 3' }
-      : { key: c.name, name: c.name + (c.is_deployed ? ' · deployed' : ''), color: colorByName.get(c.name) || CHART.equity, width: c.is_deployed ? 2.5 : 1.8 });
+      : { key: c.name, name: c.name + (c.is_deployed ? ' · deployed' : ''),
+          color: colorByName.get(c.name) || CHART.equity, width: c.is_deployed ? 2.5 : 1.8,
+          dash: DASHES[(ei++) % DASHES.length] });
   }, [curves, colorByName]);
 
   return (
@@ -52,7 +58,7 @@ export default function EnginesView() {
         <button className="btn btn--primary" onClick={() => setEditing({ mode: 'new', initial: null })} disabled={busy}>+ New engine</button>
       </div>
 
-      {curvesLoading ? (<div className="card" style={{ marginBottom: 16 }}><Spinner label="Backtesting all engines…" /></div>) : merged.length > 0 && (
+      {curvesLoading ? (<div className="card" style={{ marginBottom: 16 }}><Skeleton height={300} /></div>) : merged.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-title">Equity comparison · all engines vs benchmark</div>
           <EquityChart data={merged} series={series} height={300} />

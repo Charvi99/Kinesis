@@ -4,14 +4,25 @@ import MetricTile from '../components/MetricTile';
 import RegimeBadge from '../components/RegimeBadge';
 import DefenseGauge from '../components/DefenseGauge';
 import EquityChart from '../components/EquityChart';
-import { Spinner, ErrorState } from '../components/States';
+import Skeleton from '../components/Skeleton';
+import { ErrorState } from '../components/States';
 import { tile } from '../metrics';
 import { fmtMoney, fmtPct, fmtPctSigned, fmtNum } from '../format';
 
+function DashboardSkeleton() {
+  return (
+    <div className="view"><div className="bento">
+      <div className="card bento--hero"><Skeleton height={130} /></div>
+      <div className="card bento--defense"><Skeleton height={150} /></div>
+      <div className="card bento--chart"><Skeleton height={300} /></div>
+    </div></div>
+  );
+}
+
 export default function DashboardView() {
   const { data, error, loading, refetch } = useQuery(getPortfolioState, []);
-  if (loading) return <Spinner label="Running the strategy backtest…" />;
-  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  if (loading) return <DashboardSkeleton />;
+  if (error) return <div className="view"><ErrorState message={error} onRetry={refetch} /></div>;
   if (!data) return null;
   const m = data.metrics;
   const tot = tile('total_return', m.total_return, fmtPctSigned(m.total_return));
@@ -31,22 +42,17 @@ export default function DashboardView() {
             </div>
           </div>
           <div className="tile--hero">{fmtMoney(data.equity)}</div>
-          <div className={`hero-return ${tot.tone}`}>
-            {tot.value}<span className="hero-return-sub">{tot.sub}</span>
-          </div>
+          <div className={`hero-return ${tot.tone}`}>{tot.value}<span className="hero-return-sub">{tot.sub}</span></div>
           <p className="tag-asof">Model track record · as-of {data.as_of} · backtested, not live P&amp;L</p>
         </section>
-
         <section className="card bento--defense">
           <div className="card-title">Defense</div>
           <DefenseGauge drawdown={data.defense.drawdown} ddThreshold={data.defense.dd_threshold} volTargetFactor={data.defense.vol_target_factor} />
         </section>
-
         <section className="card bento--chart">
           <div className="card-title">Equity vs benchmark</div>
-          <EquityChart data={data.equity_curve} height={300} />
+          <EquityChart data={data.equity_curve} height={300} ariaLabel={`Kinesis equity vs benchmark, ending at ${fmtMoney(data.equity)}`} />
         </section>
-
         <section className="bento--sec">
           <div className="grid grid-tiles">
             <MetricTile label="Sharpe" {...shp} />
