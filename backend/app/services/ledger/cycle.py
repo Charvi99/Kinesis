@@ -182,7 +182,7 @@ def run_cycle(db: Session, account: PaperAccount) -> Dict:
                 "cost": 0.0, "skipped": True, "reason": "no_engine"}
 
     eq_hist = equity_history(db, account)
-    df = defense_factor(account, eng, eq_hist)
+    df = defense_factor(eng, eq_hist)
     target = target_book(closes, eng, df["factor"], df["throttle"])
     close_row = closes.iloc[-1]
 

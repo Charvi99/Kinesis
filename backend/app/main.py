@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.engines import router as engines_router
+from app.api.routes.ledger import router as ledger_router
 from app.api.routes.portfolio import router as portfolio_router
 
 logger = logging.getLogger(__name__)
@@ -41,3 +42,4 @@ def health():
 
 app.include_router(portfolio_router)
 app.include_router(engines_router)
+app.include_router(ledger_router)

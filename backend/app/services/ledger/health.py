@@ -11,6 +11,7 @@ import math
 from datetime import date
 from typing import Dict, Optional
 
+import pandas as pd
 from sqlalchemy.orm import Session
 
 from app.api.deps import load_closes
@@ -65,13 +66,18 @@ def reconcile_account(db: Session, account: PaperAccount, tolerance: float = 0.0
     snap = last_snapshot(db, account)
     positions = db.query(PaperPosition).filter_by(account_id=account.id).all()
 
-    # mark at the snapshot's own close when possible (apples-to-apples with snapshot.equity)
+    # mark at the snapshot's own close when possible (apples-to-apples with snapshot.equity).
+    # closes.index is Timestamps; snap.date is a date -> compare/lookup via Timestamp.
     as_of = None
-    if snap is not None and len(closes) and snap.date in closes.index:
-        as_of = snap.date
-    elif len(closes):
-        as_of = closes.index[-1].date()
-    close_row = closes.loc[as_of] if (as_of is not None and as_of in closes.index) else None
+    as_of_ts = None
+    if snap is not None and len(closes):
+        ts = pd.Timestamp(snap.date)
+        if ts in closes.index:
+            as_of, as_of_ts = snap.date, ts
+    if as_of is None and len(closes):
+        as_of_ts = closes.index[-1]
+        as_of = as_of_ts.date()
+    close_row = closes.loc[as_of_ts] if as_of_ts is not None else None
 
     mark = 0.0
     if close_row is not None:

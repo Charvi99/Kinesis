@@ -205,3 +205,103 @@ class CompareResponse(BaseModel):
     a: CompareSide
     b: CompareSide
     delta: CompareDelta
+
+
+# ── Paper-trading ledger (/api/v1/paper-trading) ──────────────────────────────
+# Floats throughout — display/risk numbers; the ledger itself stores DECIMAL.
+class PaperAccountOut(BaseModel):
+    id: int
+    engine_id: int
+    engine_name: str
+    is_live: bool
+    starting_cash: float
+    cash: float
+    go_live_at: Optional[str] = None
+    as_of: Optional[str] = None         # last snapshot date
+    equity: Optional[float] = None      # last snapshot equity
+    open_positions: Optional[int] = None
+
+
+class PaperPositionOut(BaseModel):
+    stock_id: int
+    symbol: str
+    name: Optional[str] = None
+    quantity: float
+    avg_cost: Optional[float] = None
+    price: Optional[float] = None
+    market_value: Optional[float] = None
+    weight: Optional[float] = None       # share of equity
+    unrealized_pnl_pct: Optional[float] = None
+
+
+class PaperFillOut(BaseModel):
+    id: int
+    stock_id: int
+    symbol: str
+    cycle_id: str
+    side: str
+    quantity: float
+    price: float
+    value: float
+    cost: float
+    reason: str
+
+
+class EquitySnapshotOut(BaseModel):
+    date: str
+    cash: float
+    positions_value: float
+    equity: float
+    gross_exposure: Optional[float] = None
+    open_positions: int
+    is_live: bool
+
+
+class PaperSummaryOut(BaseModel):
+    engine_id: int
+    engine_name: str
+    is_live: bool
+    starting_cash: float
+    equity: float
+    cash: float
+    open_positions: int
+    gross_exposure: Optional[float] = None
+    total_return: float                  # vs starting_cash
+    live_return: Optional[float] = None  # since go_live (is_live snapshots)
+    sharpe: Optional[float] = None       # over the full snapshot curve
+    max_drawdown: Optional[float] = None
+    as_of: Optional[str] = None
+    go_live_at: Optional[str] = None
+    n_snapshots: int
+
+
+class LedgerHealthOut(BaseModel):
+    account_id: int
+    engine_id: int
+    engine_name: str
+    is_live: bool
+    status: str                          # no_data | stale | ok
+    last_date: Optional[str] = None
+    latest_bar: Optional[str] = None
+    feed_age_days: Optional[int] = None
+
+
+class ReconciliationOut(BaseModel):
+    account_id: int
+    engine_id: int
+    engine_name: str
+    ok: bool
+    as_of: Optional[str] = None
+    cash: float
+    positions_value: float
+    expected_equity: float
+    snapshot_equity: Optional[float] = None
+    identity_ok: bool
+    cash_ok: bool
+    open_positions: int
+
+
+class EnableRequest(BaseModel):
+    engine_id: int
+    starting_cash: Optional[float] = Field(default=None, gt=0)  # None -> carry backtest endpoint
+
