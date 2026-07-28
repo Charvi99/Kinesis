@@ -141,6 +141,9 @@ button { font-family: inherit; }
 .badge--model { color: var(--ink-soft); background: #eef2f6; }
 .badge--reason-rank_drop { color: var(--ink-soft); background: #eef2f6; }
 .badge--reason-defense { color: var(--warn); background: var(--warn-soft); }
+.badge--live { color: #15803d; background: var(--pos-soft); font-weight: 600; }
+.live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #15803d; margin-right: 5px; vertical-align: middle; }
 
 /* ── defense gauge (signature element) ─────────────────────── */
 .gauge { margin-top: 6px; }

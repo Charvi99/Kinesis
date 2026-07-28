@@ -25,6 +25,14 @@ export const updateEngine = async (id, payload) => (await api.patch(`/engines/${
 export const deleteEngine = async (id) => (await api.delete(`/engines/${id}`)).data;
 export const deployEngine = async (id) => (await api.post(`/engines/${id}/deploy`)).data;
 
+// Paper-trading ledger: live accounts + per-engine on/off controls.
+// /enable takes a JSON body {engine_id, starting_cash?}; /disable takes engine_id as a query param.
+export const listPaperAccounts = async () => (await api.get('/paper-trading/accounts')).data;
+export const enablePaperTrading = async (engine_id, starting_cash) =>
+  (await api.post('/paper-trading/enable', { engine_id, ...(starting_cash ? { starting_cash } : {}) })).data;
+export const disablePaperTrading = async (engine_id) =>
+  (await api.post('/paper-trading/disable', null, { params: { engine_id } })).data;
+
 // Explore: sweep one knob, or compare two configs. These run real backtests, so a
 // generous timeout (a sweep of N values = N full-history backtests).
 const SLOW = { timeout: 120000 };

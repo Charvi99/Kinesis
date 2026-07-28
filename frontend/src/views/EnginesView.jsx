@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { createEngine, deleteEngine, deployEngine, getEngineCurves, listEngines, updateEngine } from '../api';
+import { createEngine, deleteEngine, deployEngine, disablePaperTrading, enablePaperTrading, getEngineCurves, listEngines, listPaperAccounts, updateEngine } from '../api';
 import { useQuery } from '../hooks/useQuery';
 import EngineForm from '../components/EngineForm';
 import EngineDetail from '../components/EngineDetail';
@@ -23,17 +23,28 @@ function MetricMini({ label, value, tone }) {
 export default function EnginesView() {
   const { data, error, loading, refetch } = useQuery(listEngines, []);
   const { data: curves, loading: curvesLoading } = useQuery(getEngineCurves, []);
+  const { data: accts, refetch: refetchAccts } = useQuery(listPaperAccounts, []);
   const [editing, setEditing] = useState(null);
   const [detail, setDetail] = useState(null);
   const [busy, setBusy] = useState(false);
   const [actErr, setActErr] = useState(null);
 
-  const act = async (fn) => { setBusy(true); setActErr(null); try { await fn(); await refetch(); } catch (e) { setActErr(e.response?.data?.detail || e.message || 'action failed'); } finally { setBusy(false); } };
+  const act = async (fn) => { setBusy(true); setActErr(null); try { await fn(); await refetch(); await refetchAccts(); } catch (e) { setActErr(e.response?.data?.detail || e.message || 'action failed'); } finally { setBusy(false); } };
   const onSave = (payload) => act(async () => { if (editing.mode === 'edit') await updateEngine(editing.initial.id, payload); else await createEngine(payload); setEditing(null); });
   const onDetailAction = (kind) => { const e = detail; setDetail(null); if (kind === 'edit') setEditing({ mode: 'edit', initial: e }); else if (kind === 'clone') setEditing({ mode: 'clone', initial: { ...e, name: `${e.name}-copy` } }); else if (kind === 'deploy') act(() => deployEngine(e.id)); else if (kind === 'delete') { if (window.confirm(`Delete engine “${e.name}”?`)) act(() => deleteEngine(e.id)); } };
 
   // stable color per engine (by list position) — ties card accent to chart line
   const colorByName = useMemo(() => { const m = new Map(); (data || []).forEach((e, i) => m.set(e.name, PALETTE[i % PALETTE.length])); return m; }, [data]);
+
+  // live paper accounts keyed by engine_id, so each card can show + toggle its paper-trade state.
+  const acctByEng = useMemo(() => { const m = new Map(); (accts || []).forEach((a) => m.set(a.engine_id, a)); return m; }, [accts]);
+
+  const onPaper = (e) => {
+    const acct = acctByEng.get(e.id);
+    if (acct && acct.is_live) { act(async () => { await disablePaperTrading(e.id); }); return; }   // live -> pause (positions frozen)
+    if (!acct && !window.confirm(`Paper-trade engine “${e.name}”? This bridges it from its backtest and books the first live cycle.`)) return;
+    act(async () => { await enablePaperTrading(e.id); });                                          // none -> enable, or paused -> resume
+  };
 
   const merged = useMemo(() => {
     if (!curves?.length) return [];
@@ -74,6 +85,7 @@ export default function EnginesView() {
           {data.map((e) => {
             const m = e.metrics || {};
             const color = colorByName.get(e.name) || '#94a3b8';
+            const acct = acctByEng.get(e.id);
             return (
               <div key={e.id} className={`card engine-card${e.is_deployed ? ' engine-card--deployed' : ''}`}
                    onClick={() => setDetail(e)} role="button" tabIndex={0} onKeyDown={(ev) => { if (ev.key === 'Enter') setDetail(e); }}
@@ -84,6 +96,8 @@ export default function EnginesView() {
                     <strong className="engine-name">{e.name}</strong>
                   </span>
                   {e.is_deployed && <span className="badge badge--held">deployed</span>}
+                  {acct?.is_live && <span className="badge badge--live"><span className="live-dot" /> live</span>}
+                  {acct && !acct.is_live && <span className="badge badge--neutral">paused</span>}
                 </div>
                 {e.description && <p className="engine-desc">{e.description}</p>}
                 <div className="engine-metrics">
@@ -95,6 +109,7 @@ export default function EnginesView() {
                 <p className="faint" style={{ fontSize: 11 }}>updated {fmtDate((e.updated_at || '').slice(0, 10))}</p>
                 <div className="engine-actions" onClick={(ev) => ev.stopPropagation()}>
                   {!e.is_deployed && <button className="btn btn--primary" disabled={busy} onClick={() => act(() => deployEngine(e.id))}>Deploy</button>}
+                  <button className={`btn ${acct && acct.is_live ? '' : 'btn--primary'}`} disabled={busy} onClick={() => onPaper(e)}>{!acct ? 'Paper-trade' : acct.is_live ? 'Pause' : 'Resume'}</button>
                   <button className="btn" disabled={busy} onClick={() => setEditing({ mode: 'edit', initial: e })}>Edit</button>
                   <button className="btn" disabled={busy} onClick={() => setEditing({ mode: 'clone', initial: { ...e, name: `${e.name}-copy` } })}>Clone</button>
                   {!e.is_deployed && <button className="btn btn--danger" disabled={busy} onClick={() => window.confirm(`Delete engine “${e.name}”?`) && act(() => deleteEngine(e.id))}>Delete</button>}

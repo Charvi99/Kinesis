@@ -43,7 +43,13 @@ export default function DashboardView() {
           </div>
           <div className="tile--hero">{fmtMoney(data.equity)}</div>
           <div className={`hero-return ${tot.tone}`}>{tot.value}<span className="hero-return-sub">{tot.sub}</span></div>
-          <p className="tag-asof">Model track record · as-of {data.as_of} · backtested, not live P&amp;L</p>
+          <div className="pillrow" style={{ marginTop: 2 }}>
+            {data.live && <span className="badge badge--live"><span className="live-dot" /> Live</span>}
+          </div>
+          <p className="tag-asof">
+            {data.live ? 'Live paper-trading' : 'Model track record'} · as-of {data.as_of}
+            {data.live ? '' : ' · backtested, not live P&amp;L'}
+          </p>
         </section>
         <section className="card bento--defense">
           <div className="card-title">Defense</div>

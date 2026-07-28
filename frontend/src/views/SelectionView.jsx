@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { getSelection } from '../api';
+import { getPortfolioState, getSelection } from '../api';
 import { useQuery } from '../hooks/useQuery';
 import { useDebounce } from '../hooks/useDebounce';
 import { Spinner, ErrorState, EmptyState } from '../components/States';
@@ -23,6 +23,8 @@ function StatusBadge({ row }) {
 
 export default function SelectionView() {
   const { data, error, loading, refetch } = useQuery(() => getSelection(100), []);
+  const { data: st } = useQuery(getPortfolioState, []);
+  const live = !!st?.live;          // flip the badge/caption when the deployed engine is live
   const [q, setQ] = useState('');
   const [sort, setSort] = useState({ key: 'rank', dir: 'asc' });
   const dq = useDebounce(q, 150).toUpperCase();
@@ -51,11 +53,13 @@ export default function SelectionView() {
     <div className="view">
       <div className="view-head row between">
         <div>
-          <h2>Selection ranking <span className="badge badge--model">model</span></h2>
+          <h2>Selection ranking {live
+            ? <span className="badge badge--live"><span className="live-dot" /> live</span>
+            : <span className="badge badge--model">model</span>}</h2>
           <p className="tag-asof">Universe ranked by 252-day momentum; top-{data?.filter((x) => x.held).length || '?'} held, vol-scaled. Current target portfolio, as-of now.</p>
         </div>
         <span className="faint" style={{ maxWidth: 280, textAlign: 'right', fontSize: 12 }}>
-          Backtest-derived target book — not a live position list until the ledger goes live.
+          {live ? 'Live paper positions — the current held book, marked-to-market.' : 'Backtest-derived target book — not a live position list until the ledger goes live.'}
         </span>
       </div>
       <div className="card">
