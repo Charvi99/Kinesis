@@ -85,6 +85,7 @@ class PortfolioState(BaseModel):
     exposure: float            # current gross exposure (last day)
     defense: DefenseState
     as_of: str                 # last date in the series
+    live: bool = False         # True when sourced from the live ledger (not modeled)
 
 
 class SelectionRow(BaseModel):

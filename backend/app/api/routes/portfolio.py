@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -26,6 +27,7 @@ from app.api.schemas import (
     SweepPoint, SweepRequest, SweepResponse, TradeRow,
 )
 from app.models.engine import Engine
+from app.models.ledger import PaperAccount, PaperEquitySnapshot, PaperFill, PaperPosition
 from app.services.backtest.metrics import summarize
 from app.services.momentum import defaults
 from app.services.momentum.engines import (
@@ -172,6 +174,114 @@ def _default_backtest(db: Session) -> dict:
     return payload
 
 
+# ── live ledger (prefer real positions/snapshots when a live account exists) ──
+def _live_account(db: Session):
+    """The deployed engine's LIVE paper account, or None (→ modeled fallback)."""
+    eng = deployed_or_seed(db)
+    if not hasattr(eng, "id"):
+        return None
+    return (db.query(PaperAccount)
+            .filter(PaperAccount.engine_id == eng.id, PaperAccount.is_live.is_(True))
+            .first())
+
+
+def _live_state(db: Session, acct, closes, spy_ret, eng, bear_mask):
+    """PortfolioState from the account's snapshots (the real book), or None if too few.
+
+    Curve + metrics span the full snapshot history (bridge + live) so the track record
+    is continuous and the defense has history; `live=True` flags it as the real book."""
+    snaps = (db.query(PaperEquitySnapshot).filter_by(account_id=acct.id)
+             .order_by(PaperEquitySnapshot.date).all())
+    if len(snaps) < 2:
+        return None
+    from app.services.ledger.cycle import defense_factor
+
+    eq = pd.Series([float(s.equity) for s in snaps],
+                   index=pd.DatetimeIndex([s.date for s in snaps]))
+    daily = eq.pct_change().dropna()
+    starting = float(acct.starting_cash)
+    last = snaps[-1]
+    df = defense_factor(eng, eq)
+    bull_mask, _ = market_regime_masks(closes)
+    m = _build_metrics(daily, None, bear_mask)
+    return PortfolioState(
+        equity=float(last.equity), starting_cash=starting, live=True,
+        equity_curve=equity_curve_points(daily, spy_ret, starting),
+        metrics=_metric_set(m),
+        regime="bull" if bool(bull_mask.iloc[-1]) else "bear",
+        exposure=_fin(last.gross_exposure) or 0.0,
+        defense=DefenseState(vol_target_factor=float(df["factor"]),
+                             drawdown=float(df["dd"]), dd_threshold=eng.dd_threshold),
+        as_of=last.date.isoformat(),
+    )
+
+
+def _live_selection(db: Session, acct, eng, closes, meta, limit: int):
+    """Real current holdings as SelectionRows (weight from the live book; momentum/rank
+    from the universe for context). held=True; changed=None (use /fills for activity)."""
+    positions = db.query(PaperPosition).filter_by(account_id=acct.id).all()
+    from app.services.ledger.health import last_snapshot
+    snap = last_snapshot(db, acct)
+    equity = float(snap.equity) if snap else float(acct.cash)
+    close_row = closes.iloc[-1]
+    mom = closes.pct_change(eng.lookback).iloc[-1]
+    ranked = mom.rank(method="first", ascending=False).fillna(10 ** 9).astype(int)
+    rows = []
+    for p in positions:
+        sid = p.stock_id
+        px = float(close_row.get(sid, float("nan")))
+        if not math.isfinite(px) or float(p.quantity) <= 0:
+            continue
+        info = meta.get(int(sid), {})
+        rows.append(SelectionRow(
+            symbol=info.get("symbol") or str(sid), name=info.get("name"),
+            momentum_score=_fin(mom.get(sid)) or 0.0, rank=int(ranked.get(sid, 999999)),
+            weight=_fin(float(p.quantity) * px / equity) or 0.0, held=True, changed=None,
+        ))
+    rows.sort(key=lambda r: r.weight, reverse=True)
+    return rows[:limit]
+
+
+def _live_trades(db: Session, acct, closes, meta, limit: int):
+    """Round-trips reconstructed from the account's fills (FIFO lots) — the real trade
+    log. Closed lots become trips at the sell; open lots are marked at the latest close."""
+    fills = (db.query(PaperFill).filter_by(account_id=acct.id)
+             .order_by(PaperFill.cycle_id.asc(), PaperFill.id.asc()).all())
+    lots: dict = {}              # sid -> [[qty, price, entry_date_str], ...]
+    out = []                     # (sid, entry, exit, entry_date, exit_date, reason)
+    for f in fills:
+        sid = f.stock_id
+        if f.side == "buy":
+            lots.setdefault(sid, []).append([float(f.quantity), float(f.price), f.cycle_id.isoformat()])
+            continue
+        to_close = float(f.quantity)
+        while to_close > 1e-9 and lots.get(sid):
+            lot = lots[sid][0]
+            q = min(to_close, lot[0])
+            lot[0] -= q
+            if lot[0] <= 1e-9:
+                lots[sid].pop(0)
+            to_close -= q
+            out.append((sid, lot[1], float(f.price), lot[2], f.cycle_id.isoformat(), f.reason))
+    close_row = closes.iloc[-1] if len(closes) else None
+    for sid, stack in lots.items():           # open lots -> open trips at latest close
+        px = float(close_row.get(sid, float("nan"))) if close_row is not None else float("nan")
+        if not math.isfinite(px):
+            continue
+        for lot in stack:
+            out.append((sid, lot[1], px, lot[2], "", "open"))
+    out.sort(key=lambda t: (t[4] or t[3]), reverse=True)
+    rows = []
+    for sid, entry, exitp, ed, xd, reason in out:
+        info = meta.get(int(sid), {})
+        rows.append(TradeRow(
+            symbol=info.get("symbol") or str(sid), entry_date=ed, exit_date=xd,
+            entry=round(entry, 4), exit=round(exitp, 4),
+            ret=float(exitp / entry - 1.0) if entry else 0.0, reason=reason,
+        ))
+    return rows[:limit]
+
+
 # ── endpoints ─────────────────────────────────────────────────────────────────
 @router.get("/config", response_model=ConfigOut)
 def get_config(db: Session = Depends(get_db)):
@@ -262,7 +372,17 @@ def _resolve_compare_side(db, engine_id, inline, start_date, end_date):
 
 @router.get("/portfolio/state", response_model=PortfolioState)
 def portfolio_state(db: Session = Depends(get_db)):
-    """Strategy backtested track record at the DEPLOYED engine config (live-P&L proxy)."""
+    """Live track record when a live account exists (real book); else the backtested
+    track record at the DEPLOYED engine config (modeled P&L proxy)."""
+    acct = _live_account(db)
+    if acct is not None:
+        eng = db.get(Engine, acct.engine_id)
+        closes = load_closes(db)
+        spy_ret = spy_series(db, closes).pct_change()
+        bear_mask = market_regime_masks(closes)[1]
+        st = _live_state(db, acct, closes, spy_ret, eng, bear_mask)
+        if st is not None:
+            return st
     payload = _default_backtest(db)
     eng, closes, spy, res = payload["eng"], payload["closes"], payload["spy"], payload["res"]
     daily = res["daily_returns"]
@@ -304,6 +424,10 @@ def selection(limit: int = Query(default=50, ge=1, le=1000), db: Session = Depen
     if len(closes) < 2:
         return []
 
+    acct = _live_account(db)
+    if acct is not None:
+        return _live_selection(db, acct, eng, closes, meta, limit)
+
     W = compute_weights(closes, **engine_selection_kwargs(eng))
     mom = closes.pct_change(eng.lookback)
     w_today, w_prev = W.iloc[-1], W.iloc[-2]
@@ -341,6 +465,11 @@ def trades(limit: int = Query(default=100, ge=1, le=1000), db: Session = Depends
     'defense' when the exit coincides with a regime flatten (whole book to cash),
     'rank_drop' otherwise. An honest, ledger-free approximation of the trade log.
     """
+    acct = _live_account(db)
+    if acct is not None:
+        closes = load_closes(db)
+        meta = load_meta(db)
+        return _live_trades(db, acct, closes, meta, limit)
     payload = _default_backtest(db)
     eng, closes = payload["eng"], payload["closes"]
     meta = load_meta(db)
