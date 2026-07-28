@@ -20,7 +20,10 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import equity_curve_points, get_db, load_closes, load_meta, spy_series
+from app.api.deps import (
+    equity_curve_from_snapshots, equity_curve_points, get_db, load_closes, load_meta,
+    spy_series,
+)
 from app.api.schemas import (
     BacktestRequest, BacktestResponse, CompareDelta, CompareRequest, CompareResponse,
     CompareSide, ConfigOut, DefenseState, MetricSet, PortfolioState, SelectionRow,
@@ -185,7 +188,7 @@ def _live_account(db: Session):
             .first())
 
 
-def _live_state(db: Session, acct, closes, spy_ret, eng, bear_mask):
+def _live_state(db: Session, acct, closes, spy, eng, bear_mask):
     """PortfolioState from the account's snapshots (the real book), or None if too few.
 
     Curve + metrics span the full snapshot history (bridge + live) so the track record
@@ -202,13 +205,12 @@ def _live_state(db: Session, acct, closes, spy_ret, eng, bear_mask):
     starting = float(acct.starting_cash)
     last = snaps[-1]
     df = defense_factor(eng, eq)
-    bull_mask, _ = market_regime_masks(closes)
     m = _build_metrics(daily, None, bear_mask)
     return PortfolioState(
         equity=float(last.equity), starting_cash=starting, live=True,
-        equity_curve=equity_curve_points(daily, spy_ret, starting),
+        equity_curve=equity_curve_from_snapshots(eq, spy),
         metrics=_metric_set(m),
-        regime="bull" if bool(bull_mask.iloc[-1]) else "bear",
+        regime="bull" if not bool(bear_mask.iloc[-1]) else "bear",
         exposure=_fin(last.gross_exposure) or 0.0,
         defense=DefenseState(vol_target_factor=float(df["factor"]),
                              drawdown=float(df["dd"]), dd_threshold=eng.dd_threshold),
@@ -378,9 +380,9 @@ def portfolio_state(db: Session = Depends(get_db)):
     if acct is not None:
         eng = db.get(Engine, acct.engine_id)
         closes = load_closes(db)
-        spy_ret = spy_series(db, closes).pct_change()
+        spy = spy_series(db, closes)
         bear_mask = market_regime_masks(closes)[1]
-        st = _live_state(db, acct, closes, spy_ret, eng, bear_mask)
+        st = _live_state(db, acct, closes, spy, eng, bear_mask)
         if st is not None:
             return st
     payload = _default_backtest(db)

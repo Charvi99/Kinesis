@@ -92,3 +92,42 @@ def equity_curve_points(
         {"date": d.strftime("%Y-%m-%d"), "equity": round(float(e), 2), "spy": round(float(s), 2)}
         for d, e, s in zip(df.index, df["equity"], df["spy"])
     ]
+
+
+def equity_curve_from_snapshots(
+    eq: pd.Series, spy_px: pd.Series, max_points: int = 600
+) -> list:
+    """Display curve from the ledger's absolute-equity snapshots + a SPY price overlay.
+
+    Used by the LIVE portfolio path. The snapshots already ARE the equity curve (absolute
+    $), so plot them directly rather than re-compounding returns from a base — the earlier
+    re-compound bug plotted from `acct.starting_cash`, which for a bridged account is the
+    carried backtest ENDPOINT (≈$298k), not the original capital ($100k), so the curve was
+    scaled ~3× too large and started at the wrong value.
+
+    SPY (a price series on closes.index) is rebased to the first snapshot's equity so both
+    lines start together for an apples-to-apples comparison. Indexes are aligned by
+    calendar DATE: snapshot dates are midnight-normalized while closes.index can carry a
+    time component, so both are normalized before reindex — otherwise SPY reindexes to
+    nothing and renders as a dead-flat line (the regression this fixes)."""
+    import numpy as np
+
+    eq = eq.copy()
+    eq.index = pd.DatetimeIndex(eq.index).normalize()
+    spy = spy_px.copy()
+    spy.index = pd.DatetimeIndex(spy.index).normalize()
+    spy = spy.reindex(eq.index).ffill()
+
+    start = float(eq.iloc[0]) if len(eq) else 0.0
+    spy0 = float(spy.iloc[0]) if len(spy) else 0.0
+    spy_rebased = spy * (start / spy0) if spy0 > 0 else spy
+
+    df = pd.DataFrame({"equity": eq.values, "spy": spy_rebased.values}, index=eq.index)
+    if len(df) > max_points:
+        step = int(np.ceil(len(df) / max_points))
+        last = df.iloc[[-1]]
+        df = pd.concat([df.iloc[::step], last]).drop_duplicates()
+    return [
+        {"date": d.strftime("%Y-%m-%d"), "equity": round(float(e), 2), "spy": round(float(s), 2)}
+        for d, e, s in zip(df.index, df["equity"], df["spy"])
+    ]
