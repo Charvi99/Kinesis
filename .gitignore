@@ -9,3 +9,7 @@ __pycache__/
 .vscode/
 .idea/
 .claude/
+
+# Celery beat scheduler local state (shelve/sqlite); regenerated on boot
+celerybeat-schedule
+celerybeat-schedule.*

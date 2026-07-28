@@ -38,12 +38,23 @@ services:
       DATABASE_URL: postgresql://kinesisuser:kinesypass123@database:5432/kinesis
       PYTHONUNBUFFERED: 1
       POLYGON_API_KEY: ${POLYGON_API_KEY:-demo}
+      # Celery (ledger cycle + digest). The /run route .delay()s onto this broker.
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      # Digest (step 6) — ET-clock hours; defaults 2 & 14 => 08:30 & 20:30 Prague.
+      DIGEST_AM_HOUR: ${DIGEST_AM_HOUR:-2}
+      DIGEST_PM_HOUR: ${DIGEST_PM_HOUR:-14}
+      GMAIL_USER: ${GMAIL_USER:-}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
+      DIGEST_TO: ${DIGEST_TO:-}
     ports:
       - "8081:8080"
     volumes:
       - ./backend:/app
     depends_on:
       database:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -59,5 +70,63 @@ services:
       - backend
     restart: unless-stopped
 
+  # ── Redis: Celery broker + result backend ──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: kinesis_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"            # host 6380 (off StockAnalyzer's 7379) for inspection
+    volumes:
+      - kinesis_redis:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --protected-mode no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Celery worker + beat (combined): the ledger cycle + digest scheduler ────
+  # threads pool (prefork's daemonic children can't spawn multiprocessing, which
+  # crashed GA's parallel precompute in StockAnalyzer; threads are safe, and the
+  # ledger cycle releases the GIL in numpy). --beat embeds the scheduler (run ONE
+  # worker only — beat must be single-instance).
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kinesis_worker
+    logging: *default-logging
+    command: >
+      bash -c "
+      alembic upgrade head &&
+      celery -A app.celery_app worker --beat --loglevel=info --pool=threads --concurrency=4 --queues=maintenance
+      "
+    environment:
+      DATABASE_URL: postgresql://kinesisuser:kinesypass123@database:5432/kinesis
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-demo}
+      PYTHONUNBUFFERED: 1
+      DIGEST_AM_HOUR: ${DIGEST_AM_HOUR:-2}
+      DIGEST_PM_HOUR: ${DIGEST_PM_HOUR:-14}
+      GMAIL_USER: ${GMAIL_USER:-}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
+      DIGEST_TO: ${DIGEST_TO:-}
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
 volumes:
   kinesis_postgres:
+  kinesis_redis:
